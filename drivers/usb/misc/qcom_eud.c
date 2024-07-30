@@ -10,6 +10,7 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
@@ -35,12 +36,16 @@ struct eud_chip {
 	struct device			*dev;
 	struct usb_role_switch		*role_sw;
 	struct phy			*usb2_phy;
+
+	/* mode lock */
+	struct mutex			mutex;
 	void __iomem			*base;
 	void __iomem			*mode_mgr;
 	unsigned int			int_status;
 	int				irq;
 	bool				enabled;
 	bool				usb_attached;
+	enum usb_role			current_role;
 };
 
 static int eud_phy_enable(struct eud_chip *chip)
@@ -64,6 +69,38 @@ static void eud_phy_disable(struct eud_chip *chip)
 	phy_exit(chip->usb2_phy);
 }
 
+static int eud_usb_role_set(struct eud_chip *chip, enum usb_role role)
+{
+	struct usb_role_switch *sw;
+	int ret = 0;
+
+	mutex_lock(&chip->mutex);
+
+	/* Avoid duplicate role handling */
+	if (role == chip->current_role)
+		goto err;
+
+	sw = usb_role_switch_get(chip->dev);
+	if (IS_ERR_OR_NULL(sw)) {
+		dev_err(chip->dev, "failed to get usb switch\n");
+		ret = -EINVAL;
+		goto err;
+	}
+
+	ret = usb_role_switch_set_role(sw, role);
+	usb_role_switch_put(sw);
+
+	if (ret) {
+		dev_err(chip->dev, "failed to set role\n");
+		goto err;
+	}
+	chip->current_role = role;
+err:
+	mutex_unlock(&chip->mutex);
+
+	return ret;
+}
+
 static int enable_eud(struct eud_chip *priv)
 {
 	int ret;
@@ -77,7 +114,7 @@ static int enable_eud(struct eud_chip *priv)
 			priv->base + EUD_REG_INT1_EN_MASK);
 	writel(1, priv->mode_mgr + EUD_REG_EUD_EN2);
 
-	return usb_role_switch_set_role(priv->role_sw, USB_ROLE_DEVICE);
+	return ret;
 }
 
 static void disable_eud(struct eud_chip *priv)
@@ -106,15 +143,20 @@ static ssize_t enable_store(struct device *dev,
 	if (kstrtobool(buf, &enable))
 		return -EINVAL;
 
+	/* EUD enable is applicable only in DEVICE mode */
+	if (enable && chip->current_role != USB_ROLE_DEVICE)
+		return -EINVAL;
+
 	if (enable) {
 		ret = enable_eud(chip);
-		if (!ret)
-			chip->enabled = enable;
-		else
-			disable_eud(chip);
+		if (ret) {
+			dev_err(chip->dev, "failed to enable eud\n");
+			return count;
+		}
 	} else {
 		disable_eud(chip);
 	}
+	chip->enabled = enable;
 
 	return count;
 }
@@ -185,11 +227,9 @@ static irqreturn_t handle_eud_irq_thread(int irq, void *data)
 	int ret;
 
 	if (chip->usb_attached)
-		ret = usb_role_switch_set_role(chip->role_sw, USB_ROLE_DEVICE);
+		ret = eud_usb_role_set(chip, USB_ROLE_DEVICE);
 	else
-		ret = usb_role_switch_set_role(chip->role_sw, USB_ROLE_HOST);
-	if (ret)
-		dev_err(chip->dev, "failed to set role switch\n");
+		ret = eud_usb_role_set(chip, USB_ROLE_HOST);
 
 	/* set and clear vbus_int_clr[0] to clear interrupt */
 	writel(BIT(0), chip->base + EUD_REG_VBUS_INT_CLR);
@@ -198,16 +238,18 @@ static irqreturn_t handle_eud_irq_thread(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void eud_role_switch_release(void *data)
+static int eud_usb_role_switch_set(struct usb_role_switch *sw,
+				   enum usb_role role)
 {
-	struct eud_chip *chip = data;
+	struct eud_chip *chip = usb_role_switch_get_drvdata(sw);
 
-	usb_role_switch_put(chip->role_sw);
+	return eud_usb_role_set(chip, role);
 }
 
 static int eud_probe(struct platform_device *pdev)
 {
 	struct eud_chip *chip;
+	struct usb_role_switch_desc eud_role_switch = {NULL};
 	int ret;
 
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
@@ -220,16 +262,6 @@ static int eud_probe(struct platform_device *pdev)
 	if (IS_ERR(chip->usb2_phy))
 		return dev_err_probe(chip->dev, PTR_ERR(chip->usb2_phy),
 				     "no usb2 phy configured\n");
-
-	chip->role_sw = usb_role_switch_get(&pdev->dev);
-	if (IS_ERR(chip->role_sw))
-		return dev_err_probe(chip->dev, PTR_ERR(chip->role_sw),
-					"failed to get role switch\n");
-
-	ret = devm_add_action_or_reset(chip->dev, eud_role_switch_release, chip);
-	if (ret)
-		return dev_err_probe(chip->dev, ret,
-				"failed to add role switch release action\n");
 
 	chip->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(chip->base))
@@ -248,6 +280,18 @@ static int eud_probe(struct platform_device *pdev)
 	if (ret)
 		return dev_err_probe(chip->dev, ret, "failed to allocate irq\n");
 
+	eud_role_switch.fwnode = dev_fwnode(chip->dev);
+	eud_role_switch.set = eud_usb_role_switch_set;
+	eud_role_switch.get = NULL;
+	eud_role_switch.driver_data = chip;
+	chip->role_sw = usb_role_switch_register(chip->dev, &eud_role_switch);
+
+	if (IS_ERR(chip->role_sw))
+		return dev_err_probe(chip->dev, PTR_ERR(chip->role_sw),
+				"failed to register role switch\n");
+
+	mutex_init(&chip->mutex);
+
 	enable_irq_wake(chip->irq);
 
 	platform_set_drvdata(pdev, chip);
@@ -261,6 +305,9 @@ static void eud_remove(struct platform_device *pdev)
 
 	if (chip->enabled)
 		disable_eud(chip);
+
+	if (chip->role_sw)
+		usb_role_switch_unregister(chip->role_sw);
 
 	device_init_wakeup(&pdev->dev, false);
 	disable_irq_wake(chip->irq);
