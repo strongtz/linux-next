@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
@@ -33,6 +34,7 @@
 struct eud_chip {
 	struct device			*dev;
 	struct usb_role_switch		*role_sw;
+	struct phy			*usb2_phy;
 	void __iomem			*base;
 	void __iomem			*mode_mgr;
 	unsigned int			int_status;
@@ -41,8 +43,35 @@ struct eud_chip {
 	bool				usb_attached;
 };
 
+static int eud_phy_enable(struct eud_chip *chip)
+{
+	int ret;
+
+	ret = phy_init(chip->usb2_phy);
+	if (ret)
+		return ret;
+
+	ret = phy_power_on(chip->usb2_phy);
+	if (ret)
+		phy_exit(chip->usb2_phy);
+
+	return ret;
+}
+
+static void eud_phy_disable(struct eud_chip *chip)
+{
+	phy_power_off(chip->usb2_phy);
+	phy_exit(chip->usb2_phy);
+}
+
 static int enable_eud(struct eud_chip *priv)
 {
+	int ret;
+
+	ret = eud_phy_enable(priv);
+	if (ret)
+		return ret;
+
 	writel(EUD_ENABLE, priv->base + EUD_REG_CSR_EUD_EN);
 	writel(EUD_INT_VBUS | EUD_INT_SAFE_MODE,
 			priv->base + EUD_REG_INT1_EN_MASK);
@@ -55,6 +84,7 @@ static void disable_eud(struct eud_chip *priv)
 {
 	writel(0, priv->base + EUD_REG_CSR_EUD_EN);
 	writel(0, priv->mode_mgr + EUD_REG_EUD_EN2);
+	eud_phy_disable(priv);
 }
 
 static ssize_t enable_show(struct device *dev,
@@ -185,6 +215,11 @@ static int eud_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	chip->dev = &pdev->dev;
+
+	chip->usb2_phy = devm_phy_get(chip->dev, "usb2-phy");
+	if (IS_ERR(chip->usb2_phy))
+		return dev_err_probe(chip->dev, PTR_ERR(chip->usb2_phy),
+				     "no usb2 phy configured\n");
 
 	chip->role_sw = usb_role_switch_get(&pdev->dev);
 	if (IS_ERR(chip->role_sw))
