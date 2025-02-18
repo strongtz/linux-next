@@ -300,9 +300,12 @@ int qcom_cc_really_probe(struct device *dev,
 	if (!cc)
 		return -ENOMEM;
 
-	ret = devm_pm_domain_attach_list(dev, NULL, &cc->pd_list);
-	if (ret < 0 && ret != -EEXIST)
-		return ret;
+	cc->pd_list = desc->pd_list;
+	if (!cc->pd_list) {
+		ret = devm_pm_domain_attach_list(dev, NULL, &cc->pd_list);
+		if (ret < 0 && ret != -EEXIST)
+			return ret;
+	}
 
 	reset = &cc->reset;
 	reset->rcdev.of_node = dev->of_node;
