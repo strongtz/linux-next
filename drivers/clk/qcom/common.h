@@ -38,6 +38,7 @@ struct qcom_cc_desc {
 	const struct qcom_icc_hws_data *icc_hws;
 	size_t num_icc_hws;
 	unsigned int icc_first_node_id;
+	struct dev_pm_domain_list *pd_list;
 };
 
 /**
@@ -76,5 +77,6 @@ extern int qcom_cc_probe(struct platform_device *pdev,
 			 const struct qcom_cc_desc *desc);
 extern int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 				  const struct qcom_cc_desc *desc);
+extern int qcom_cc_attach_pds(struct device *dev, struct qcom_cc_desc *desc);
 
 #endif

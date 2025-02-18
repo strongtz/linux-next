@@ -391,5 +391,17 @@ int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 }
 EXPORT_SYMBOL_GPL(qcom_cc_probe_by_index);
 
+int qcom_cc_attach_pds(struct device *dev, struct qcom_cc_desc *desc)
+{
+	int ret;
+
+	ret = devm_pm_domain_attach_list(dev, NULL, &desc->pd_list);
+	if (ret < 0 && ret != -EEXIST)
+		return ret;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(qcom_cc_attach_pds);
+
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("QTI Common Clock module");
