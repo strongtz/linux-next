@@ -12,7 +12,9 @@ menuconfig INPUT_TOUCHSCREEN
 
 if INPUT_TOUCHSCREEN
 
-source "drivers/input/touchscreen/fts521/Kconfig"
+# source "drivers/input/touchscreen/fts521/Kconfig"
+source "drivers/input/touchscreen/fts_521/Kconfig"
+source "drivers/input/touchscreen/xiaomi/Kconfig"
 
 config TOUCHSCREEN_88PM860X
 	tristate "Marvell 88PM860x touchscreen"

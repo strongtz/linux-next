@@ -2610,8 +2610,10 @@ static int fts_mode_handler(struct fts_ts_info *info, int force)
 		 * of the following options */
 		/* settings[0] = ACTIVE_MULTI_TOUCH | ACTIVE_KEY | ACTIVE_HOVER
 		 * | ACTIVE_PROXIMITY | ACTIVE_FORCE; */
-		settings[0] = 0xFF; /* enable all the possible scans mode
-					 * supported by the config */
+		// settings[0] = 0xFF; /* enable all the possible scans mode
+					//  * supported by the config */
+		settings[0] = 0x01;
+
 		logError(0, "%s %s: Sense ON!\n", tag, __func__);
 		res |= setScanMode(SCAN_MODE_ACTIVE, settings[0]);
 		info->mode |= (SCAN_MODE_ACTIVE << 24);
@@ -2840,7 +2842,7 @@ static int fts_enable_reg(struct fts_ts_info *info, bool enable)
 		if (retval < 0) {
 			logError(1, "%s %s Failed to set avdd reg voltage!\n",
 				 tag, __func__);
-			goto disable_bus_reg;
+			// goto disable_bus_reg;
 		}
 		retval = regulator_enable(info->avdd_reg);
 		if (retval < 0) {
@@ -3140,6 +3142,7 @@ static int fts_probe(struct spi_device *client)
 	if (retval < 0) {
 		logError(1, "%s ERROR: %s: Failed to get regulators\n", tag,
 			 __func__);
+		error = -EPROBE_DEFER;
 		goto ProbeErrorExit_1;
 	}
 
