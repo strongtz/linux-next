@@ -2424,6 +2424,13 @@ static bool qmp_combo_configure_dp_mode(struct qmp_combo *qmp)
 	const struct phy_configure_opts_dp *dp_opts = &qmp->dp_opts;
 	u32 val;
 
+	struct device *dev = qmp->dev;
+
+	if (reverse)
+		dev_info(dev, "Configuring DP for reverse orientation\n");
+	else
+		dev_info(dev, "Configuring DP for normal orientation\n");
+
 	val = DP_PHY_PD_CTL_PWRDN | DP_PHY_PD_CTL_AUX_PWRDN |
 	      DP_PHY_PD_CTL_PLL_PWRDN | DP_PHY_PD_CTL_DP_CLAMP_EN;
 
@@ -3771,7 +3778,7 @@ static int qmp_combo_probe(struct platform_device *pdev)
 	qmp->dev = dev;
 	dev_set_drvdata(dev, qmp);
 
-	qmp->orientation = TYPEC_ORIENTATION_NORMAL;
+	qmp->orientation = TYPEC_ORIENTATION_REVERSE;
 
 	qmp->cfg = of_device_get_match_data(dev);
 	if (!qmp->cfg)
