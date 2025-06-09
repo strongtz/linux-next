@@ -501,6 +501,8 @@ static int ufs_qcom_power_up_sequence(struct ufs_hba *hba)
 			host_params->hs_rate = PA_HS_MODE_B;
 	}
 
+	host_params->hs_rate = PA_HS_MODE_A;
+
 	mode = host_params->hs_rate == PA_HS_MODE_B ? PHY_MODE_UFS_HS_B : PHY_MODE_UFS_HS_A;
 
 	/* Reset UFS Host Controller and PHY */
