@@ -1432,9 +1432,13 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	ret = rproc_start(rproc, fw);
-	if (ret)
-		goto clean_up_resources;
-
+	if (ret) {
+		// HACK: try again
+		ret = rproc_start(rproc, fw);
+		if (ret) {
+			goto clean_up_resources;
+		}
+	}
 	return 0;
 
 clean_up_resources:
