@@ -739,6 +739,11 @@
 	status = "okay";
 };
 
+// Otherwise it takes a long time in ufshcd_init_crypto
+&ice {
+	status = "disabled";
+};
+
 &lpass_audiocc {
 	compatible = "qcom,qcm6490-lpassaudiocc";
 	/delete-property/ power-domains;
@@ -1313,6 +1318,8 @@
 	vccq-max-microamp = <900000>;
 	vccq2-supply = <&vreg_l9b_1p2>;
 	vccq2-max-microamp = <1300000>;
+
+	/delete-property/ qcom,ice;
 
 	status = "okay";
 };
