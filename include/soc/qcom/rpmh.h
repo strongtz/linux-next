@@ -11,6 +11,9 @@
 
 
 #if IS_ENABLED(CONFIG_QCOM_RPMH)
+int rpmh_read(const struct device *dev, enum rpmh_state state,
+	      struct tcs_cmd *cmd, u32 n);
+
 int rpmh_write(const struct device *dev, enum rpmh_state state,
 	       const struct tcs_cmd *cmd, u32 n);
 
@@ -23,6 +26,10 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
 void rpmh_invalidate(const struct device *dev);
 
 #else
+
+static inline int rpmh_read(const struct device *dev, enum rpmh_state state,
+			    struct tcs_cmd *cmd, u32 n)
+{ return -ENODEV; }
 
 static inline int rpmh_write(const struct device *dev, enum rpmh_state state,
 			     const struct tcs_cmd *cmd, u32 n)
