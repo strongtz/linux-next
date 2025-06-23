@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
 // Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -33,8 +34,13 @@ enum rpmh_regulator_type {
 };
 
 #define RPMH_REGULATOR_REG_VRM_VOLTAGE		0x0
+#define RPMH_REGULATOR_VOLTAGE_MASK		0x1FFF
+
 #define RPMH_REGULATOR_REG_ENABLE		0x4
+#define RPMH_REGULATOR_ENABLE_MASK		0x1
+
 #define RPMH_REGULATOR_REG_VRM_MODE		0x8
+#define RPMH_REGULATOR_MODE_MASK		0x7
 
 #define PMIC4_LDO_MODE_RETENTION		4
 #define PMIC4_LDO_MODE_LPM			5
@@ -174,6 +180,28 @@ static int rpmh_regulator_send_request(struct rpmh_vreg *vreg,
 	return ret;
 }
 
+static int rpmh_regulator_read_data(struct rpmh_vreg *vreg, struct tcs_cmd *cmd)
+{
+	return rpmh_read(vreg->dev, RPMH_ACTIVE_ONLY_STATE, cmd, 1);
+}
+
+static int _rpmh_regulator_vrm_get_voltage(struct regulator_dev *rdev, int *uV)
+{
+	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+	struct tcs_cmd cmd = {
+		.addr = vreg->addr + RPMH_REGULATOR_REG_VRM_VOLTAGE,
+	};
+	int ret;
+
+	ret = rpmh_regulator_read_data(vreg, &cmd);
+	if (!ret)
+		*uV = (cmd.data & RPMH_REGULATOR_VOLTAGE_MASK) * 1000;
+	else
+		dev_err(vreg->dev, "failed to read VOLTAGE ret = %d\n", ret);
+
+	return ret;
+}
+
 static int _rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
 				unsigned int selector, bool wait_for_ack)
 {
@@ -215,6 +243,14 @@ static int rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
 static int rpmh_regulator_vrm_get_voltage_sel(struct regulator_dev *rdev)
 {
 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+	int ret, uV = 0;
+
+	if (vreg->voltage_selector < 0) {
+		ret = _rpmh_regulator_vrm_get_voltage(rdev, &uV);
+		if (!ret && uV != 0)
+			vreg->voltage_selector = regulator_map_voltage_linear_range(rdev,
+							uV, INT_MAX);
+	}
 
 	return vreg->voltage_selector;
 }
@@ -222,6 +258,18 @@ static int rpmh_regulator_vrm_get_voltage_sel(struct regulator_dev *rdev)
 static int rpmh_regulator_is_enabled(struct regulator_dev *rdev)
 {
 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+	struct tcs_cmd cmd = {
+		.addr = vreg->addr + RPMH_REGULATOR_REG_ENABLE,
+	};
+	int ret;
+
+	if (vreg->enabled < 0) {
+		ret = rpmh_regulator_read_data(vreg, &cmd);
+		if (!ret)
+			vreg->enabled = cmd.data & RPMH_REGULATOR_ENABLE_MASK;
+		else
+			dev_err(vreg->dev, "failed to read ENABLE status ret = %d\n", ret);
+	}
 
 	return vreg->enabled;
 }
@@ -303,6 +351,29 @@ static int rpmh_regulator_vrm_set_mode(struct regulator_dev *rdev,
 static unsigned int rpmh_regulator_vrm_get_mode(struct regulator_dev *rdev)
 {
 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+	struct tcs_cmd cmd = {
+		.addr = vreg->addr + RPMH_REGULATOR_REG_VRM_MODE,
+	};
+	int ret, pmic_mode, mode;
+
+	if (vreg->mode > REGULATOR_MODE_INVALID && vreg->mode <= REGULATOR_MODE_STANDBY)
+		return vreg->mode;
+
+	ret = rpmh_regulator_read_data(vreg, &cmd);
+	if (!ret) {
+		pmic_mode = cmd.data & RPMH_REGULATOR_MODE_MASK;
+		if (pmic_mode == 0)
+			return vreg->mode;
+
+		for (mode = 0; mode <= REGULATOR_MODE_STANDBY; mode++) {
+			if (pmic_mode == vreg->hw_data->pmic_mode_map[mode]) {
+				vreg->mode = mode;
+				break;
+			}
+		}
+	} else {
+		dev_err(vreg->dev, "failed to read MODE ret = %d\n", ret);
+	}
 
 	return vreg->mode;
 }
