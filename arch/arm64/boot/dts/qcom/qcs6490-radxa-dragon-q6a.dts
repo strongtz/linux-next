@@ -66,6 +66,8 @@
 		qcom,hphl-jack-type-normally-closed;
 
 		#sound-dai-cells = <1>;
+
+		status = "disabled";
 	};
 
 	bridge {
@@ -620,7 +622,7 @@
 	vdda-phy-supply = <&vreg_l10c_0p88>;
 	vdda-pll-supply = <&vreg_l6b_1p2>;
 
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -640,12 +642,14 @@
 };
 
 &cci0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &cci0_i2c0 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+
+	status = "disabled";
 
 	camera@1a {
 		compatible = "sony,imx577";
@@ -675,6 +679,10 @@
 	};
 };
 
+&crypto {
+	status = "disabled";
+};
+
 &gcc {
 	protected-clocks = <GCC_CFG_NOC_LPASS_CLK>,
 			   <GCC_MSS_CFG_AHB_CLK>,
@@ -694,7 +702,7 @@
 };
 
 &gpi_dma1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &gpu {
@@ -708,24 +716,24 @@
 /* Pin 13, 15 in GPIO header */
 &i2c0 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 /* Pin 27, 28 in GPIO header */
 &i2c2 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 /* Pin 3, 5 in GPIO header */
 &i2c6 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 &i2c10 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 
 	rtc: rtc@68 {
 		compatible = "st,m41t11";
@@ -736,7 +744,7 @@
 /* External touchscreen */
 &i2c13 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 // Otherwise it takes a long time in ufshcd_init_crypto
@@ -747,18 +755,19 @@
 &lpass_audiocc {
 	compatible = "qcom,qcm6490-lpassaudiocc";
 	/delete-property/ power-domains;
+	status = "disabled";
 };
 
 &lpass_rx_macro {
-	status = "okay";
+	status = "disabled";
 };
 
 &lpass_tx_macro {
-	status = "okay";
+	status = "disabled";
 };
 
 &lpass_va_macro {
-	status = "okay";
+	status = "disabled";
 };
 
 &mdss {
@@ -968,17 +977,17 @@
 
 &qupv3_id_1 {
 	firmware-name = "qcom/qcm6490/qupv3fw.elf";
-	status = "okay";
+	status = "disabled";
 };
 
 &remoteproc_adsp {
 	firmware-name = "qcom/qcs6490/radxa/dragon-q6a/adsp.mbn";
-	status = "okay";
+	status = "disabled";
 };
 
 &remoteproc_cdsp {
 	firmware-name = "qcom/qcs6490/radxa/dragon-q6a/cdsp.mbn";
-	status = "okay";
+	status = "disabled";
 };
 
 &sdhc_2 {
@@ -993,108 +1002,26 @@
 	cd-gpios = <&tlmm 91 GPIO_ACTIVE_LOW>;
 };
 
-&sound {
-	compatible = "qcom,qcs6490-rb3gen2-sndcard";
-	model = "QCS6490-Radxa-Dragon-Q6A";
-
-	audio-routing =
-		"IN1_HPHL", "HPHL_OUT",
-		"IN2_HPHR", "HPHR_OUT",
-		"AMIC2", "MIC BIAS2",
-		// "TX DMIC0", "MIC BIAS1",
-		// "TX DMIC1", "MIC BIAS2",
-		// "TX DMIC2", "MIC BIAS3",
-		"TX SWR_ADC1", "ADC2_OUTPUT";
-		// "VA DMIC0", "VA MIC BIAS3",
-		// "VA DMIC1", "VA MIC BIAS3",
-		// "VA DMIC2", "VA MIC BIAS1",
-		// "VA DMIC3", "VA MIC BIAS1";
-
-	wcd-playback-dai-link {
-		link-name = "WCD Playback";
-
-		cpu {
-			sound-dai = <&q6apmbedai RX_CODEC_DMA_RX_0>;
-		};
-
-		codec {
-			sound-dai = <&wcd938x 0>, <&swr0 0>, <&lpass_rx_macro 0>;
-		};
-
-		platform {
-			sound-dai = <&q6apm>;
-		};
-	};
-
-	wcd-capture-dai-link {
-		link-name = "WCD Capture";
-
-		cpu {
-			sound-dai = <&q6apmbedai TX_CODEC_DMA_TX_3>;
-		};
-
-		codec {
-			sound-dai = <&wcd938x 1>, <&swr1 0>, <&lpass_tx_macro 0>;
-		};
-
-		platform {
-			sound-dai = <&q6apm>;
-		};
-	};
-
-	dp0-dai-link {
-		link-name = "DP0 Playback";
-
-		cpu {
-			sound-dai = <&q6apmbedai DISPLAY_PORT_RX_0>;
-		};
-
-		codec {
-			sound-dai = <&mdss_dp>;
-		};
-
-		platform {
-			sound-dai = <&q6apm>;
-		};
-	};
-
-	// va-dai-link {
-	// 	link-name = "CODEC_DMA-LPAIF_VA-TX-0";
-
-	// 	cpu {
-	// 		sound-dai = <&q6apmbedai VA_CODEC_DMA_TX_0>;
-	// 	};
-
-	// 	codec {
-	// 		sound-dai = <&lpass_va_macro 0>;
-	// 	};
-
-	// 	platform {
-	// 		sound-dai = <&q6apm>;
-	// 	};
-	// };
-};
-
 /* Pin 11, 29, 31, 32 in GPIO header */
 &spi7 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 /* Pin 19, 21, 23, 24, 26 in GPIO header */
 &spi12 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 /* Pin 22, 33, 36, 37 in GPIO header */
 &spi14 {
 	qcom,enable-gsi-dma;
-	status = "okay";
+	status = "disabled";
 };
 
 &swr0 {
-	status = "okay";
+	status = "disabled";
 
 	wcd_rx: codec@0,4 {
 		compatible = "sdw20217010d00";
@@ -1104,7 +1031,7 @@
 };
 
 &swr1 {
-	status = "okay";
+	status = "disabled";
 
 	wcd_tx: codec@0,3 {
 		compatible = "sdw20217010d00";
@@ -1346,7 +1273,9 @@
 };
 
 &usb_1_dwc3 {
-	dr_mode = "host";
+	dr_mode = "otg";
+	usb-role-switch;
+	role-switch-default-mode = "peripheral";
 };
 
 &usb_1_hsphy {
@@ -1385,7 +1314,7 @@
 };
 
 &venus {
-	status = "okay";
+	status = "disabled";
 };
 
 /* PINCTRL - additions to nodes defined in sc7280.dtsi */
