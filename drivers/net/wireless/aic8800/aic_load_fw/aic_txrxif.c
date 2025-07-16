@@ -26,7 +26,7 @@
 #include "aicbluetooth.h"
 #include "aicbluetooth_cmds.h"
 
-int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
+int aicwf_bus_init_loadfw(uint bus_hdrlen, struct device *dev)
 {
     int ret = 0;
     struct aicwf_bus *bus_if;
@@ -59,8 +59,8 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
     bus_if->busrx_thread = kthread_run(sdio_busrx_thread, (void *)bus_if->bus_priv.sdio->rx_priv, "aicwf_busrx_thread");
 #endif
 #ifdef AICWF_USB_SUPPORT
-    bus_if->bustx_thread = kthread_run(usb_bustx_thread, (void *)bus_if, "aicwf_bustx_thread");
-    bus_if->busrx_thread = kthread_run(usb_busrx_thread, (void *)bus_if->bus_priv.usb->rx_priv, "aicwf_busrx_thread");
+    bus_if->bustx_thread = kthread_run(usb_bustx_thread_loadfw, (void *)bus_if, "aicwf_bustx_thread");
+    bus_if->busrx_thread = kthread_run(usb_busrx_thread_loadfw, (void *)bus_if->bus_priv.usb->rx_priv, "aicwf_busrx_thread");
 #endif
 
     if (IS_ERR(bus_if->bustx_thread)) {
@@ -77,12 +77,12 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 
     return ret;
 fail:
-    aicwf_bus_deinit(dev);
+    aicwf_bus_deinit_loadfw(dev);
 
     return ret;
 }
 
-void aicwf_bus_deinit(struct device *dev)
+void aicwf_bus_deinit_loadfw(struct device *dev)
 {
     struct aicwf_bus *bus_if;
     struct aic_usb_dev *usbdev;
@@ -122,13 +122,13 @@ void aicwf_bus_deinit(struct device *dev)
     printk("exit %s\n", __func__);
 }
 
-void aicwf_frame_tx(void *dev, struct sk_buff *skb)
+void aicwf_frame_tx_loadfw(void *dev, struct sk_buff *skb)
 {
     struct aic_usb_dev *usbdev = (struct aic_usb_dev *)dev;
     aicwf_bus_txdata(usbdev->bus_if, skb);
 }
 
-struct aicwf_tx_priv* aicwf_tx_init(void *arg)
+struct aicwf_tx_priv* aicwf_tx_init_loadfw(void *arg)
 {
     struct aicwf_tx_priv* tx_priv;
 
@@ -151,7 +151,7 @@ struct aicwf_tx_priv* aicwf_tx_init(void *arg)
     return tx_priv;
 }
 
-void aicwf_tx_deinit(struct aicwf_tx_priv* tx_priv)
+void aicwf_tx_deinit_loadfw(struct aicwf_tx_priv* tx_priv)
 {
     if (tx_priv && tx_priv->aggr_buf)
         dev_kfree_skb(tx_priv->aggr_buf);
@@ -177,7 +177,7 @@ static bool aicwf_another_ptk(struct sk_buff *skb)
     return true;
 }
 
-int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+int aicwf_process_rxframes_loadfw(struct aicwf_rx_priv *rx_priv)
 {
     int ret = 0;
     unsigned long flags = 0;
@@ -189,11 +189,11 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
 
     while (1) {
         spin_lock_irqsave(&rx_priv->rxqlock, flags);
-        if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
+        if(aicwf_is_framequeue_empty_loadfw(&rx_priv->rxq)) {
             spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
             break;
         }
-        skb = aicwf_frame_dequeue(&rx_priv->rxq);
+        skb = aicwf_frame_dequeue_loadfw(&rx_priv->rxq);
         spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
         if (skb == NULL) {
             txrx_err("skb_error\r\n");
@@ -214,7 +214,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                 skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);//8 is for ccmp mic or wep icv
                 if(skb_inblock == NULL){
                     txrx_err("no more space!\n");
-                    aicwf_dev_skb_free(skb);
+                    aicwf_dev_skb_free_loadfw(skb);
                     return -EBADE;
                 }
 
@@ -233,14 +233,14 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                skb_inblock = __dev_alloc_skb(aggr_len+4, GFP_KERNEL);
                if(skb_inblock == NULL){
                    txrx_err("no more space!\n");
-                   aicwf_dev_skb_free(skb);
+                   aicwf_dev_skb_free_loadfw(skb);
                    return -EBADE;
                 }
 
                 skb_put(skb_inblock, aggr_len+4);
                 memcpy(skb_inblock->data, data, aggr_len+4);
                 if((*(skb_inblock->data + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP)
-                    rwnx_rx_handle_msg(rx_priv->usbdev, (struct ipc_e2a_msg *)(skb_inblock->data + 4));
+                    rwnx_rx_handle_msg_loadfw(rx_priv->usbdev, (struct ipc_e2a_msg *)(skb_inblock->data + 4));
                 skb_pull(skb, adjust_len+4);
             }
         }
@@ -273,7 +273,7 @@ static struct recv_msdu *aicwf_rxframe_queue_init(struct list_head *q, int qsize
     return reqs;
 }
 
-struct aicwf_rx_priv *aicwf_rx_init(void *arg)
+struct aicwf_rx_priv *aicwf_rx_init_loadfw(void *arg)
 {
     struct aicwf_rx_priv* rx_priv;
     rx_priv = kzalloc(sizeof(struct aicwf_rx_priv), GFP_KERNEL);
@@ -281,7 +281,7 @@ struct aicwf_rx_priv *aicwf_rx_init(void *arg)
         return NULL;
 
     rx_priv->usbdev = (struct aic_usb_dev *)arg;
-    aicwf_frame_queue_init(&rx_priv->rxq, 1, MAX_RXQLEN);
+    aicwf_frame_queue_init_loadfw(&rx_priv->rxq, 1, MAX_RXQLEN);
     spin_lock_init(&rx_priv->rxqlock);
     atomic_set(&rx_priv->rx_cnt, 0);
 
@@ -309,10 +309,10 @@ static void aicwf_recvframe_queue_deinit(struct list_head *q)
     }
 }
 
-void aicwf_rx_deinit(struct aicwf_rx_priv* rx_priv)
+void aicwf_rx_deinit_loadfw(struct aicwf_rx_priv* rx_priv)
 {
     //struct reord_ctrl_info *reord_info, *tmp;
-    aicwf_frame_queue_flush(&rx_priv->rxq);
+    aicwf_frame_queue_flush_loadfw(&rx_priv->rxq);
     aicwf_recvframe_queue_deinit(&rx_priv->rxframes_freequeue);
     if (rx_priv->recv_frames)
         vfree(rx_priv->recv_frames);
@@ -328,13 +328,13 @@ void aicwf_rx_deinit(struct aicwf_rx_priv* rx_priv)
     rx_priv = NULL;
 }
 
-bool aicwf_rxframe_enqueue(struct device *dev, struct frame_queue *q, struct sk_buff *pkt)
+bool aicwf_rxframe_enqueue_loadfw(struct device *dev, struct frame_queue *q, struct sk_buff *pkt)
 {
-    return aicwf_frame_enq(dev, q, pkt, 0);
+    return aicwf_frame_enq_loadfw(dev, q, pkt, 0);
 }
 
 
-void aicwf_dev_skb_free(struct sk_buff *skb)
+void aicwf_dev_skb_free_loadfw(struct sk_buff *skb)
 {
     if (!skb)
         return;
@@ -358,7 +358,7 @@ static struct sk_buff *aicwf_frame_queue_penq(struct frame_queue *pq, int prio, 
     return p;
 }
 
-void aicwf_frame_queue_flush(struct frame_queue *pq)
+void aicwf_frame_queue_flush_loadfw(struct frame_queue *pq)
 {
     int prio;
     struct sk_buff_head *q;
@@ -369,13 +369,13 @@ void aicwf_frame_queue_flush(struct frame_queue *pq)
         q = &pq->queuelist[prio];
         skb_queue_walk_safe(q, p, next) {
             skb_unlink(p, q);
-            aicwf_dev_skb_free(p);
+            aicwf_dev_skb_free_loadfw(p);
             pq->qcnt--;
         }
     }
 }
 
-void aicwf_frame_queue_init(struct frame_queue *pq, int num_prio, int max_len)
+void aicwf_frame_queue_init_loadfw(struct frame_queue *pq, int num_prio, int max_len)
 {
     int prio;
 
@@ -388,7 +388,7 @@ void aicwf_frame_queue_init(struct frame_queue *pq, int num_prio, int max_len)
     }
 }
 
-struct sk_buff *aicwf_frame_queue_peek_tail(struct frame_queue *pq, int *prio_out)
+struct sk_buff *aicwf_frame_queue_peek_tail_loadfw(struct frame_queue *pq, int *prio_out)
 {
     int prio;
 
@@ -405,7 +405,7 @@ struct sk_buff *aicwf_frame_queue_peek_tail(struct frame_queue *pq, int *prio_ou
     return skb_peek_tail(&pq->queuelist[prio]);
 }
 
-bool aicwf_is_framequeue_empty(struct frame_queue *pq)
+bool aicwf_is_framequeue_empty_loadfw(struct frame_queue *pq)
 {
     int prio, len = 0;
 
@@ -418,7 +418,7 @@ bool aicwf_is_framequeue_empty(struct frame_queue *pq)
         return true;
 }
 
-struct sk_buff *aicwf_frame_dequeue(struct frame_queue *pq)
+struct sk_buff *aicwf_frame_dequeue_loadfw(struct frame_queue *pq)
 {
     struct sk_buff_head *q;
     struct sk_buff *p;
@@ -452,7 +452,7 @@ static struct sk_buff *aicwf_skb_dequeue_tail(struct frame_queue *pq, int prio)
     return p;
 }
 
-bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio)
+bool aicwf_frame_enq_loadfw(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio)
 {
     struct sk_buff *p = NULL;
     int prio_modified = -1;
@@ -464,7 +464,7 @@ bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *
     if (q->queuelist[prio].qlen >= q->qmax) {
         prio_modified = prio;
     } else if (q->qcnt >= q->qmax) {
-        p = aicwf_frame_queue_peek_tail(q, &prio_modified);
+        p = aicwf_frame_queue_peek_tail_loadfw(q, &prio_modified);
         if (prio_modified > prio)
             return false;
     }
@@ -474,7 +474,7 @@ bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *
             return false;
 
         p = aicwf_skb_dequeue_tail(q, prio_modified);
-        aicwf_dev_skb_free(p);
+        aicwf_dev_skb_free_loadfw(p);
 
         p = aicwf_frame_queue_penq(q, prio_modified, pkt);
         if (p == NULL)

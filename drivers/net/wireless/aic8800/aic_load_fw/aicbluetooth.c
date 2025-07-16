@@ -178,8 +178,8 @@ static const char* aic_default_fw_path = "/lib/firmware/aic8800_fw/USB";
 #else
 static const char* aic_default_fw_path = "/vendor/etc/firmware";
 #endif
-char aic_fw_path[FW_PATH_MAX];
-module_param_string(aic_fw_path, aic_fw_path, FW_PATH_MAX, 0660);
+char aic_fw_path_loadfw[FW_PATH_MAX];
+module_param_string(aic_fw_path_loadfw, aic_fw_path_loadfw, FW_PATH_MAX, 0660);
 #ifdef CONFIG_M2D_OTA_AUTO_SUPPORT
 char saved_sdk_ver[64];
 module_param_string(saved_sdk_ver, saved_sdk_ver,64, 0660);
@@ -188,7 +188,7 @@ module_param_string(saved_sdk_ver, saved_sdk_ver,64, 0660);
 
 int aic_bt_platform_init(struct aic_usb_dev *usbdev)
 {
-    rwnx_cmd_mgr_init(&usbdev->cmd_mgr);
+    rwnx_cmd_mgr_init_loadfw(&usbdev->cmd_mgr);
     usbdev->cmd_mgr.usbdev = (void *)usbdev;
     return 0;
 
@@ -196,7 +196,7 @@ int aic_bt_platform_init(struct aic_usb_dev *usbdev)
 
 void aic_bt_platform_deinit(struct aic_usb_dev *usbdev)
 {
-	rwnx_cmd_mgr_deinit(&usbdev->cmd_mgr);
+	rwnx_cmd_mgr_deinit_loadfw(&usbdev->cmd_mgr);
 }
 
 #define MD5(x) x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15]
@@ -241,9 +241,9 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
 	
 	*fw_buf = buffer;
 
-	MD5Init(&md5);
-	MD5Update(&md5, (unsigned char *)buffer, size);
-	MD5Final(&md5, decrypt);
+	MD5Init_loadfw(&md5);
+	MD5Update_loadfw(&md5, (unsigned char *)buffer, size);
+	MD5Final_loadfw(&md5, decrypt);
 	printk(MD5PINRT, MD5(decrypt));
 	
 	release_firmware(fw);
@@ -270,9 +270,9 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
             return -1;
     }
 
-    if (strlen(aic_fw_path) > 0) {
+    if (strlen(aic_fw_path_loadfw) > 0) {
 		printk("%s: use customer define fw_path\n", __func__);
-		len = snprintf(path, FW_PATH_MAX, "%s/%s", aic_fw_path, name);
+		len = snprintf(path, FW_PATH_MAX, "%s/%s", aic_fw_path_loadfw, name);
     } else {
     #if defined(CONFIG_PLATFORM_UBUNTU)
         if (usb_dev->chipid == PRODUCT_ID_AIC8800) {
@@ -387,10 +387,10 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
     //*fw_buf = dst;
 	*fw_buf = (u32 *)buffer;
 
-	MD5Init(&md5);
-	//MD5Update(&md5, (unsigned char *)dst, size);
-	MD5Update(&md5, (unsigned char *)buffer, size);
-	MD5Final(&md5, decrypt);
+	MD5Init_loadfw(&md5);
+	//MD5Update_loadfw(&md5, (unsigned char *)dst, size);
+	MD5Update_loadfw(&md5, (unsigned char *)buffer, size);
+	MD5Final_loadfw(&md5, decrypt);
 
 	printk(MD5PINRT, MD5(decrypt));
 
@@ -422,7 +422,7 @@ int rwnx_plat_bin_fw_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
 
     if (size > 1024) {// > 1KB data
         for (i = 0; i < (size - 1024); i += 1024) {//each time write 1KB
-            err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, 1024, dst + i / 4);
+            err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, fw_addr + i, 1024, dst + i / 4);
                 if (err) {
                 printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
                 break;
@@ -431,7 +431,7 @@ int rwnx_plat_bin_fw_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
     }
 
     if (!err && (i < size)) {// <1KB data
-        err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, size - i, dst + i / 4);
+        err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, fw_addr + i, size - i, dst + i / 4);
         if (err) {
             printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
         }
@@ -447,7 +447,7 @@ int rwnx_plat_bin_fw_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
     return err;
 }
 
-extern int testmode;
+extern int testmode_loadfw;
 #ifdef CONFIG_M2D_OTA_AUTO_SUPPORT
 int rwnx_plat_m2d_flash_ota_android(struct aic_usb_dev *usbdev, char *filename)
 {
@@ -461,7 +461,7 @@ int rwnx_plat_m2d_flash_ota_android(struct aic_usb_dev *usbdev, char *filename)
     const u32 mem_addr = 0x40500000;
     struct dbg_mem_read_cfm rd_mem_addr_cfm;
 
-    ret = rwnx_send_dbg_mem_read_req(usbdev, mem_addr, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usbdev, mem_addr, &rd_mem_addr_cfm);
     if (ret) {
         printk("m2d %x rd fail: %d\n", mem_addr, ret);
         return ret;
@@ -487,12 +487,12 @@ int rwnx_plat_m2d_flash_ota_android(struct aic_usb_dev *usbdev, char *filename)
     printk("### Upload m2d %s flash, size=%d\n", filename, size);
 
 	/*send info first*/
-	err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_INFO_ADDR, 4, (u32 *)&size);
+	err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_INFO_ADDR, 4, (u32 *)&size);
 	
 	/*send data first*/
     if (size > 1024) {// > 1KB data
         for (i = 0; i < (size - 1024); i += 1024) {//each time write 1KB
-            err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_DATA_ADDR, 1024, dst + i / 4);
+            err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_DATA_ADDR, 1024, dst + i / 4);
                 if (err) {
                 printk("m2d upload fail: %x, err:%d\r\n", AIC_M2D_OTA_DATA_ADDR, err);
                 break;
@@ -501,7 +501,7 @@ int rwnx_plat_m2d_flash_ota_android(struct aic_usb_dev *usbdev, char *filename)
     }
 
     if (!err && (i < size)) {// <1KB data
-        err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_DATA_ADDR, size - i, dst + i / 4);
+        err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_DATA_ADDR, size - i, dst + i / 4);
         if (err) {
             printk("m2d upload fail: %x, err:%d\r\n", AIC_M2D_OTA_DATA_ADDR, err);
         }
@@ -511,7 +511,7 @@ int rwnx_plat_m2d_flash_ota_android(struct aic_usb_dev *usbdev, char *filename)
         vfree(dst);
         dst = NULL;
     }
-	testmode = FW_NORMAL_MODE;
+	testmode_loadfw = FW_NORMAL_MODE;
 
     printk("m2d flash update complete\n\n");
 
@@ -543,7 +543,7 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
 	u32 flash_ver[16];
 	u32 ota_ver[16];
 
-    ret = rwnx_send_dbg_mem_read_req(usbdev, mem_addr, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usbdev, mem_addr, &rd_mem_addr_cfm);
     if (ret) {
         printk("m2d %x rd fail: %d\n", mem_addr, ret);
         return ret;
@@ -555,14 +555,14 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
 		printk("m2d flash is invalid\n");
 		return -1;
 	}
-    ret = rwnx_send_dbg_mem_read_req(usbdev, mem_addr_code_start, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usbdev, mem_addr_code_start, &rd_mem_addr_cfm);
 	if (ret){
         printk("mem_addr_code_start %x rd fail: %d\n", mem_addr_code_start, ret);
         return ret;
 	}
 	code_start_addr = rd_mem_addr_cfm.memdata;
 
-    ret = rwnx_send_dbg_mem_read_req(usbdev, mem_addr_sdk_ver, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usbdev, mem_addr_sdk_ver, &rd_mem_addr_cfm);
 	if (ret){
         printk("mem_addr_sdk_ver %x rd fail: %d\n", mem_addr_code_start, ret);
         return ret;
@@ -592,7 +592,7 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
 
 	} else {
 		for(i=0;i<16;i++){
-			ret = rwnx_send_dbg_mem_read_req(usbdev, (sdk_ver_addr+i*4), &rd_mem_addr_cfm);
+			ret = rwnx_send_dbg_mem_read_req_loadfw(usbdev, (sdk_ver_addr+i*4), &rd_mem_addr_cfm);
 			if (ret){
 				printk("mem_addr_sdk_ver %x rd fail: %d\n", mem_addr_code_start, ret);
 				return ret;
@@ -636,12 +636,12 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
     printk("### Upload m2d %s flash, size=%d\n", filename, size);
 
 	/*send info first*/
-	err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_INFO_ADDR, 4, (u32 *)&size);
+	err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_INFO_ADDR, 4, (u32 *)&size);
 	
 	/*send data first*/
     if (size > 1024) {// > 1KB data
         for (i = 0; i < (size - 1024); i += 1024) {//each time write 1KB
-            err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_DATA_ADDR, 1024, dst + i / 4);
+            err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_DATA_ADDR, 1024, dst + i / 4);
                 if (err) {
                 printk("m2d upload fail: %x, err:%d\r\n", AIC_M2D_OTA_DATA_ADDR, err);
                 break;
@@ -650,7 +650,7 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
     }
 
     if (!err && (i < size)) {// <1KB data
-        err = rwnx_send_dbg_mem_block_write_req(usbdev, AIC_M2D_OTA_DATA_ADDR, size - i, dst + i / 4);
+        err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, AIC_M2D_OTA_DATA_ADDR, size - i, dst + i / 4);
         if (err) {
             printk("m2d upload fail: %x, err:%d\r\n", AIC_M2D_OTA_DATA_ADDR, err);
         }
@@ -660,7 +660,7 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
         vfree(dst);
         dst = NULL;
     }
-	testmode = FW_NORMAL_MODE;
+	testmode_loadfw = FW_NORMAL_MODE;
 
     printk("m2d flash update complete\n\n");
 
@@ -696,7 +696,7 @@ int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
         return -1;
     }
 
-    err = rwnx_send_dbg_mem_read_req(usbdev, mem_addr, &rd_mem_addr_cfm);
+    err = rwnx_send_dbg_mem_read_req_loadfw(usbdev, mem_addr, &rd_mem_addr_cfm);
     if (err) {
         printk("%x rd fail: %d\n", mem_addr, err);
         return err;
@@ -706,7 +706,7 @@ int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
         //erase flash
         if (size > 0x40000) {
             for (i = 0; i < (size - 0x40000); i +=0x40000) {//each time erase 256K
-                err = rwnx_send_dbg_mem_mask_write_req(usbdev, fw_addr+i, 0xf150e250, 0x40000);
+                err = rwnx_send_dbg_mem_mask_write_req_loadfw(usbdev, fw_addr+i, 0xf150e250, 0x40000);
                 if (err) {
                     printk("flash erase fail: %x, err:%d\r\n", fw_addr + i, err);
                     return err;
@@ -714,7 +714,7 @@ int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
             }
         }
         if (!err && (i < size)) {// <256KB data
-            err = rwnx_send_dbg_mem_mask_write_req(usbdev, fw_addr + i, 0xf150e250, size - i);
+            err = rwnx_send_dbg_mem_mask_write_req_loadfw(usbdev, fw_addr + i, 0xf150e250, size - i);
             if (err) {
                 printk("flash erase fail: %x, err:%d\r\n", fw_addr + i, err);
             }
@@ -726,7 +726,7 @@ int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
 
     if (size > 1024) {// > 1KB data
         for (i = 0; i < (size - 1024); i += 1024) {//each time write 1KB
-            err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, 1024, dst + i / 4);
+            err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, fw_addr + i, 1024, dst + i / 4);
                 if (err) {
                 printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
                 break;
@@ -735,7 +735,7 @@ int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
     }
 
     if (!err && (i < size)) {// <1KB data
-        err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, size - i, dst + i / 4);
+        err = rwnx_send_dbg_mem_block_write_req_loadfw(usbdev, fw_addr + i, size - i, dst + i / 4);
         if (err) {
             printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
         }
@@ -784,7 +784,7 @@ uint32_t rwnx_atoli(char *value){
 	return result;
 }
 
-int8_t rwnx_atoi(char *value){
+int8_t rwnx_atoi_loadfw(char *value){
 	int len = 0;
 	int i = 0;
 	int8_t result = 0;
@@ -815,19 +815,19 @@ int8_t rwnx_atoi(char *value){
 }
 
 void get_fw_path(char* fw_path){
-	if (strlen(aic_fw_path) > 0) {
-		memcpy(fw_path, aic_fw_path, strlen(aic_fw_path));
+	if (strlen(aic_fw_path_loadfw) > 0) {
+		memcpy(fw_path, aic_fw_path_loadfw, strlen(aic_fw_path_loadfw));
 	}else{
 		memcpy(fw_path, aic_default_fw_path, strlen(aic_default_fw_path));
 	}
 } 
 
 void set_testmode(int val){
-	testmode = val;
+	testmode_loadfw = val;
 }
 
 int get_testmode(void){
-	return testmode;
+	return testmode_loadfw;
 }
 
 int get_hardware_info(void){
@@ -850,7 +850,7 @@ EXPORT_SYMBOL(get_hardware_info);
 EXPORT_SYMBOL(get_adap_test);
 
 
-void get_userconfig_xtal_cap(xtal_cap_conf_t *xtal_cap)
+void get_userconfig_xtal_cap_loadfw(xtal_cap_conf_t *xtal_cap)
 {
 	xtal_cap->enable = userconfig_xtal_cap.enable;
 	xtal_cap->xtal_cap = userconfig_xtal_cap.xtal_cap;
@@ -861,7 +861,7 @@ void get_userconfig_xtal_cap(xtal_cap_conf_t *xtal_cap)
     printk("%s:xtal_cap_fine:%d\r\n", __func__, xtal_cap->xtal_cap_fine);
 }
 
-EXPORT_SYMBOL(get_userconfig_xtal_cap);
+EXPORT_SYMBOL(get_userconfig_xtal_cap_loadfw);
 
 void get_userconfig_txpwr_idx(txpwr_idx_conf_t *txpwr_idx){
 	txpwr_idx->enable = userconfig_txpwr_idx.enable;
@@ -917,51 +917,51 @@ void rwnx_plat_userconfig_set_value(char *command, char *value){
 	//TODO send command
 	printk("%s:command=%s value=%s \r\n", __func__, command, value);
 	if(!strcmp(command, "enable")){
-		userconfig_txpwr_idx.enable = rwnx_atoi(value);
+		userconfig_txpwr_idx.enable = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "dsss")){
-		userconfig_txpwr_idx.dsss = rwnx_atoi(value);
+		userconfig_txpwr_idx.dsss = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdmlowrate_2g4")){
-		userconfig_txpwr_idx.ofdmlowrate_2g4 = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdmlowrate_2g4 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm64qam_2g4")){
-		userconfig_txpwr_idx.ofdm64qam_2g4 = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm64qam_2g4 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm256qam_2g4")){
-		userconfig_txpwr_idx.ofdm256qam_2g4 = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm256qam_2g4 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm1024qam_2g4")){
-		userconfig_txpwr_idx.ofdm1024qam_2g4 = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm1024qam_2g4 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdmlowrate_5g")){
-		userconfig_txpwr_idx.ofdmlowrate_5g = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdmlowrate_5g = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm64qam_5g")){
-		userconfig_txpwr_idx.ofdm64qam_5g = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm64qam_5g = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm256qam_5g")){
-		userconfig_txpwr_idx.ofdm256qam_5g = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm256qam_5g = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofdm1024qam_5g")){
-		userconfig_txpwr_idx.ofdm1024qam_5g = rwnx_atoi(value);
+		userconfig_txpwr_idx.ofdm1024qam_5g = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_enable")){
-		userconfig_txpwr_ofst.enable = rwnx_atoi(value);
+		userconfig_txpwr_ofst.enable = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_1_4")){
-		userconfig_txpwr_ofst.chan_1_4 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_1_4 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_5_9")){
-		userconfig_txpwr_ofst.chan_5_9 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_5_9 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_10_13")){
-		userconfig_txpwr_ofst.chan_10_13 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_10_13 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_36_64")){
-		userconfig_txpwr_ofst.chan_36_64 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_36_64 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_100_120")){
-		userconfig_txpwr_ofst.chan_100_120 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_100_120 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_122_140")){
-		userconfig_txpwr_ofst.chan_122_140 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_122_140 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "ofst_chan_142_165")){
-		userconfig_txpwr_ofst.chan_142_165 = rwnx_atoi(value);
+		userconfig_txpwr_ofst.chan_142_165 = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "xtal_enable")){
-		userconfig_xtal_cap.enable = rwnx_atoi(value);
+		userconfig_xtal_cap.enable = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "xtal_cap")){
-		userconfig_xtal_cap.xtal_cap = rwnx_atoi(value);
+		userconfig_xtal_cap.xtal_cap = rwnx_atoi_loadfw(value);
 	}else if(!strcmp(command, "xtal_cap_fine")){
-		userconfig_xtal_cap.xtal_cap_fine = rwnx_atoi(value);
+		userconfig_xtal_cap.xtal_cap_fine = rwnx_atoi_loadfw(value);
 	}
 }
 
-void rwnx_plat_userconfig_parsing(char *buffer, int size){
+void rwnx_plat_userconfig_parsing_loadfw(char *buffer, int size){
     int i = 0;
 	int parse_state = 0;
 	char command[30];
@@ -1044,7 +1044,7 @@ int rwnx_plat_userconfig_upload_android(struct aic_usb_dev *usbdev, char *filena
 	/* Copy the file on the Embedded side */
     printk("### Upload %s userconfig, size=%d\n", filename, size);
 
-	rwnx_plat_userconfig_parsing((char *)dst, size);
+	rwnx_plat_userconfig_parsing_loadfw((char *)dst, size);
 
 	if (dst) {
         vfree(dst);
@@ -1224,7 +1224,7 @@ int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table 
 			continue;
 		}
 		for (i = 0; i < p->len; i++) {
-			ret = rwnx_send_dbg_mem_write_req(usbdev, *data, *(data + 1));
+			ret = rwnx_send_dbg_mem_write_req_loadfw(usbdev, *data, *(data + 1));
 			if (ret != 0)
 				return ret;
 			data += 2;

@@ -89,7 +89,7 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 
     if (!defer_push) {
         //printk("queue:id=%x, param_len=%u\n",cmd->a2e_msg->id, cmd->a2e_msg->param_len);
-        aicwf_set_cmd_tx((void *)(cmd_mgr->usbdev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
+        aicwf_set_cmd_tx_loadfw((void *)(cmd_mgr->usbdev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
         kfree(cmd->a2e_msg);
     } else {
         printk("ERR: never defer push!!!!");
@@ -203,7 +203,7 @@ static void cmd_mgr_drain(struct rwnx_cmd_mgr *cmd_mgr)
     spin_unlock_bh(&cmd_mgr->lock);
 }
 
-void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
+void rwnx_cmd_mgr_init_loadfw(struct rwnx_cmd_mgr *cmd_mgr)
 {
     cmd_mgr->max_queue_sz = RWNX_CMD_MAX_QUEUED;
     INIT_LIST_HEAD(&cmd_mgr->cmds);
@@ -226,7 +226,7 @@ void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
     #endif
 }
 
-void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr)
+void rwnx_cmd_mgr_deinit_loadfw(struct rwnx_cmd_mgr *cmd_mgr)
 {
     cmd_mgr->print(cmd_mgr);
     cmd_mgr->drain(cmd_mgr);
@@ -234,7 +234,7 @@ void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr)
     memset(cmd_mgr, 0, sizeof(*cmd_mgr));
 }
 
-void aicwf_set_cmd_tx(void *dev, struct lmac_msg *msg, uint len)
+void aicwf_set_cmd_tx_loadfw(void *dev, struct lmac_msg *msg, uint len)
 {
 	struct aic_usb_dev *usbdev = (struct aic_usb_dev *)dev;
     struct aicwf_bus *bus = usbdev->bus_if;
@@ -328,7 +328,7 @@ static int rwnx_send_msg(struct aic_usb_dev *usbdev, const void *msg_params,
         cmd->flags &= ~RWNX_CMD_FLAG_WAIT_ACK; // we don't need ack any more
         ret = usbdev->cmd_mgr.queue(&usbdev->cmd_mgr,cmd);
     } else {
-        aicwf_set_cmd_tx((void *)(usbdev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
+        aicwf_set_cmd_tx_loadfw((void *)(usbdev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
     }
 
     if(!reqcfm)
@@ -337,7 +337,7 @@ static int rwnx_send_msg(struct aic_usb_dev *usbdev, const void *msg_params,
     return ret;
 }
 
-int rwnx_send_dbg_mem_mask_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
+int rwnx_send_dbg_mem_mask_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr,
                                      u32 mem_mask, u32 mem_data)
 {
     struct dbg_mem_mask_write_req *mem_mask_write_req;
@@ -359,7 +359,7 @@ int rwnx_send_dbg_mem_mask_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
 
 
 
-int rwnx_send_dbg_mem_block_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
+int rwnx_send_dbg_mem_block_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr,
                                       u32 mem_size, u32 *mem_data)
 {
     struct dbg_mem_block_write_req *mem_blk_write_req;
@@ -380,7 +380,7 @@ int rwnx_send_dbg_mem_block_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
 }
 
 
-int rwnx_send_dbg_mem_read_req(struct aic_usb_dev *usbdev, u32 mem_addr,
+int rwnx_send_dbg_mem_read_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr,
                                struct dbg_mem_read_cfm *cfm)
 {
     struct dbg_mem_read_req *mem_read_req;
@@ -400,7 +400,7 @@ int rwnx_send_dbg_mem_read_req(struct aic_usb_dev *usbdev, u32 mem_addr,
 }
 
 
-int rwnx_send_dbg_mem_write_req(struct aic_usb_dev *usbdev, u32 mem_addr, u32 mem_data)
+int rwnx_send_dbg_mem_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr, u32 mem_data)
 {
     struct dbg_mem_write_req *mem_write_req;
 
@@ -420,7 +420,7 @@ int rwnx_send_dbg_mem_write_req(struct aic_usb_dev *usbdev, u32 mem_addr, u32 me
     return rwnx_send_msg(usbdev, mem_write_req, 1, DBG_MEM_WRITE_CFM, NULL);
 }
 
-int rwnx_send_dbg_start_app_req(struct aic_usb_dev *usbdev, u32 boot_addr,
+int rwnx_send_dbg_start_app_req_loadfw(struct aic_usb_dev *usbdev, u32 boot_addr,
                                 u32 boot_type)
 {
     struct dbg_start_app_req *start_app_req;
@@ -447,21 +447,21 @@ static msg_cb_fct *msg_hdlrs[] = {
     [TASK_DBG]   = dbg_hdlrs,
 };
 
-void rwnx_rx_handle_msg(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg)
+void rwnx_rx_handle_msg_loadfw(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg)
 {
     usbdev->cmd_mgr.msgind(&usbdev->cmd_mgr, msg,
                             msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
 }
 
 
-int rwnx_send_reboot(struct aic_usb_dev *usbdev)
+int rwnx_send_reboot_loadfw(struct aic_usb_dev *usbdev)
 {
     int ret = 0;
     u32 delay = 2 *1000; //1s
 
     printk("%s enter \r\n", __func__);
 
-    ret = rwnx_send_dbg_start_app_req(usbdev, delay, HOST_START_APP_REBOOT);
+    ret = rwnx_send_dbg_start_app_req_loadfw(usbdev, delay, HOST_START_APP_REBOOT);
     return ret;
 }
 

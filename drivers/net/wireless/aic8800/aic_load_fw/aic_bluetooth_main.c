@@ -15,20 +15,20 @@
 #define DRV_AUTHOR       "AICSemi"
 #define DRV_VERS_MOD "1.0"
 
-int testmode = FW_NORMAL_MODE;
+int testmode_loadfw = FW_NORMAL_MODE;
 int adap_test = 0;
 char paringid[100];
 int n_para = 1;
 int ble_scan_wakeup_reboot_time = 1000;
-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
+int aicwf_dbg_level_loadfw = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
 int flash_erase_len = 0x400000;
 uint32_t ad_data_filter_mask = 0;
 uint32_t gpio_num = 2;//default select gpiob2 for fw_wakeup_host
 uint32_t gpio_dft_lvl = 0;//0:defalut pull down,  1:default pull up
 
-module_param(aicwf_dbg_level, int, 0660);
+module_param(aicwf_dbg_level_loadfw, int, 0660);
 module_param(ble_scan_wakeup_reboot_time, int, 0660);
-module_param(testmode, int, 0660);
+module_param(testmode_loadfw, int, 0660);
 module_param(adap_test, int, 0660);
 module_param_string(paringid, paringid, 100, 0660);
 module_param(flash_erase_len, int, 0660);
@@ -36,7 +36,7 @@ module_param(flash_erase_len, int, 0660);
 
 static void aicsmac_driver_register(void)
 {
-    aicwf_usb_register();
+    aicwf_usb_register_loadfw();
 }
 
 static int __init aic_bluetooth_mod_init(void)
@@ -54,7 +54,7 @@ static int __init aic_bluetooth_mod_init(void)
 static void __exit aic_bluetooth_mod_exit(void)
 {
     printk("%s\n", __func__);
-    aicwf_usb_exit();
+    aicwf_usb_exit_loadfw();
     
 #ifdef CONFIG_PREALLOC_RX_SKB
     aicwf_prealloc_exit();

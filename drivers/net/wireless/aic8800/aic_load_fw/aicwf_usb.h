@@ -219,12 +219,12 @@ struct aic_usb_dev {
     u32 fw_version_uint;
 };
 
-extern void aicwf_usb_exit(void);
-extern void aicwf_usb_register(void);
-extern void aicwf_usb_tx_flowctrl(struct aic_usb_dev *usb_dev, bool state);
-int usb_bustx_thread(void *data);
-int usb_busrx_thread(void *data);
-int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv);
+extern void aicwf_usb_exit_loadfw(void);
+extern void aicwf_usb_register_loadfw(void);
+extern void aicwf_usb_tx_flowctrl_loadfw(struct aic_usb_dev *usb_dev, bool state);
+int usb_bustx_thread_loadfw(void *data);
+int usb_busrx_thread_loadfw(void *data);
+int aicwf_process_rxframes_loadfw(struct aicwf_rx_priv *rx_priv);
 
 #endif /* AICWF_USB_SUPPORT */
 #endif /* _AICWF_USB_H_       */

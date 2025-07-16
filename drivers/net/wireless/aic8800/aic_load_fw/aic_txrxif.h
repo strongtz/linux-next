@@ -197,20 +197,20 @@ static inline void aicwf_sched_timeout(u32 millisec)
     }
 }
 
-int aicwf_bus_init(uint bus_hdrlen, struct device *dev);
-void aicwf_bus_deinit(struct device *dev);
-void aicwf_tx_deinit(struct aicwf_tx_priv* tx_priv);
-void aicwf_rx_deinit(struct aicwf_rx_priv* rx_priv);
-struct aicwf_tx_priv* aicwf_tx_init(void *arg);
-struct aicwf_rx_priv* aicwf_rx_init(void *arg);
-void aicwf_frame_queue_init(struct frame_queue *pq, int num_prio, int max_len);
-void aicwf_frame_queue_flush(struct frame_queue *pq);
-bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio);
-bool aicwf_rxframe_enqueue(struct device *dev, struct frame_queue *q, struct sk_buff *pkt);
-bool aicwf_is_framequeue_empty(struct frame_queue *pq);
-void aicwf_frame_tx(void *dev, struct sk_buff *skb);
-void aicwf_dev_skb_free(struct sk_buff *skb);
-struct sk_buff *aicwf_frame_dequeue(struct frame_queue *pq);
-struct sk_buff *aicwf_frame_queue_peek_tail(struct frame_queue *pq, int *prio_out);
+int aicwf_bus_init_loadfw(uint bus_hdrlen, struct device *dev);
+void aicwf_bus_deinit_loadfw(struct device *dev);
+void aicwf_tx_deinit_loadfw(struct aicwf_tx_priv* tx_priv);
+void aicwf_rx_deinit_loadfw(struct aicwf_rx_priv* rx_priv);
+struct aicwf_tx_priv* aicwf_tx_init_loadfw(void *arg);
+struct aicwf_rx_priv* aicwf_rx_init_loadfw(void *arg);
+void aicwf_frame_queue_init_loadfw(struct frame_queue *pq, int num_prio, int max_len);
+void aicwf_frame_queue_flush_loadfw(struct frame_queue *pq);
+bool aicwf_frame_enq_loadfw(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio);
+bool aicwf_rxframe_enqueue_loadfw(struct device *dev, struct frame_queue *q, struct sk_buff *pkt);
+bool aicwf_is_framequeue_empty_loadfw(struct frame_queue *pq);
+void aicwf_frame_tx_loadfw(void *dev, struct sk_buff *skb);
+void aicwf_dev_skb_free_loadfw(struct sk_buff *skb);
+struct sk_buff *aicwf_frame_dequeue_loadfw(struct frame_queue *pq);
+struct sk_buff *aicwf_frame_queue_peek_tail_loadfw(struct frame_queue *pq, int *prio_out);
 
 #endif /* _AICWF_TXRXIF_H_ */

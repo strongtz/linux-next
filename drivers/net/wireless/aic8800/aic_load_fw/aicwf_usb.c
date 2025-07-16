@@ -30,18 +30,18 @@
 #define JUMP_TABLE_BASE   0x161928
 #define JUMP_TABLE_OFFSET(i) ((u32)(JUMP_TABLE_BASE+(i)*4))
 extern int adap_test;
-extern int testmode;
+extern int testmode_loadfw;
 extern unsigned char paringid[100];
 extern int ble_scan_wakeup_reboot_time;
 extern uint32_t ad_data_filter_mask;
 extern uint32_t gpio_num;//default select gpiob2 for fw_wakeup_host
 extern uint32_t gpio_dft_lvl;//0:defalut pull down,  1:default pull up
-u8 chip_id = 0;
-u8 chip_sub_id = 0;
-u8 chip_mcu_id = 0;
+u8 chip_id_loadfw = 0;
+u8 chip_sub_id_loadfw = 0;
+u8 chip_mcu_id_loadfw = 0;
 int fw_loaded = 0;
 
-void aicwf_usb_tx_flowctrl(struct aic_usb_dev *usb_dev, bool state)
+void aicwf_usb_tx_flowctrl_loadfw(struct aic_usb_dev *usb_dev, bool state)
 {
 }
 
@@ -128,7 +128,7 @@ static void aicwf_usb_tx_complete(struct urb *urb)
     if (usb_dev->tx_free_count > AICWF_USB_TX_HIGH_WATER) {
         if (usb_dev->tbusy) {
             usb_dev->tbusy = false;
-            aicwf_usb_tx_flowctrl(usb_dev, false);
+            aicwf_usb_tx_flowctrl_loadfw(usb_dev, false);
         }
     }
     spin_unlock_irqrestore(&usb_dev->tx_flow_lock, flags);
@@ -146,14 +146,14 @@ static void aicwf_usb_rx_complete(struct urb *urb)
     usb_buf->skb = NULL;
 
     if (urb->actual_length > urb->transfer_buffer_length) {
-        aicwf_dev_skb_free(skb);
+        aicwf_dev_skb_free_loadfw(skb);
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
         schedule_work(&usb_dev->rx_urb_work);
         return;
     }
 
     if (urb->status != 0 || !urb->actual_length) {
-        aicwf_dev_skb_free(skb);
+        aicwf_dev_skb_free_loadfw(skb);
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
         schedule_work(&usb_dev->rx_urb_work);
         return;
@@ -163,10 +163,10 @@ static void aicwf_usb_rx_complete(struct urb *urb)
         skb_put(skb, urb->actual_length);
 
         spin_lock_irqsave(&rx_priv->rxqlock, flags);
-        if(!aicwf_rxframe_enqueue(usb_dev->dev, &rx_priv->rxq, skb)){
+        if(!aicwf_rxframe_enqueue_loadfw(usb_dev->dev, &rx_priv->rxq, skb)){
             spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
             usb_err("rx_priv->rxq is over flow!!!\n");
-            aicwf_dev_skb_free(skb);
+            aicwf_dev_skb_free_loadfw(skb);
             return;
         }
         spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
@@ -176,7 +176,7 @@ static void aicwf_usb_rx_complete(struct urb *urb)
 
         schedule_work(&usb_dev->rx_urb_work);
     } else {
-        aicwf_dev_skb_free(skb);
+        aicwf_dev_skb_free_loadfw(skb);
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
     }
 }
@@ -217,7 +217,7 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
     if (ret) {
         usb_err("usb submit rx urb fail:%d\n", ret);
         usb_unanchor_urb(usb_buf->urb);
-        aicwf_dev_skb_free(usb_buf->skb);
+        aicwf_dev_skb_free_loadfw(usb_buf->skb);
         usb_buf->skb = NULL;
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
         msleep(100);
@@ -322,7 +322,7 @@ static inline void aic_thread_wait_stop(void)
 #endif
 }
 
-int usb_bustx_thread(void *data)
+int usb_bustx_thread_loadfw(void *data)
 {
     struct aicwf_bus *bus = (struct aicwf_bus *)data;
     struct aic_usb_dev *usbdev = bus->bus_priv.usb;
@@ -353,7 +353,7 @@ int usb_bustx_thread(void *data)
     return 0;
 }
 
-int usb_busrx_thread(void *data)
+int usb_busrx_thread_loadfw(void *data)
 {
     struct aicwf_rx_priv *rx_priv = (struct aicwf_rx_priv *)data;
     struct aicwf_bus *bus_if = rx_priv->usbdev->bus_if;
@@ -367,7 +367,7 @@ int usb_busrx_thread(void *data)
         }
 		#endif
         if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) {
-            aicwf_process_rxframes(rx_priv);
+            aicwf_process_rxframes_loadfw(rx_priv);
         } else {
             break;
         }
@@ -604,7 +604,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
     spin_lock_irqsave(&usb_dev->tx_flow_lock, flags);
     if (usb_dev->tx_free_count < AICWF_USB_TX_LOW_WATER) {
         usb_dev->tbusy = true;
-        aicwf_usb_tx_flowctrl(usb_dev, true);
+        aicwf_usb_tx_flowctrl_loadfw(usb_dev, true);
     }
     spin_unlock_irqrestore(&usb_dev->tx_flow_lock, flags);
 
@@ -861,7 +861,7 @@ static struct aicwf_bus_ops aicwf_usb_bus_ops = {
 };
 
 #if 0
-u32 patch_tbl[][2] =
+u32 patch_tbl_loadfw[][2] =
 {
 #if defined(CONFIG_RFTEST)
     {JUMP_TABLE_OFFSET(28), 0x16b4c5}, // 161998
@@ -896,7 +896,7 @@ u32 patch_tbl_rf[][2] =
 };
 #endif
 #if 0
-u32 patch_tbl[18][2] =
+u32 patch_tbl_loadfw[18][2] =
 {
     {0x0044, 0x00000002}, //hosttype
     {0x0048, 0x00000060},
@@ -927,13 +927,13 @@ u32 patch_tbl[18][2] =
 };
 #endif
 
-u32 adaptivity_patch_tbl[][2] = {
+u32 adaptivity_patch_tbl_loadfw[][2] = {
 	{0x0004, 0x0000320A}, //linkloss_thd
     {0x0094, 0x00000000}, //ac_param_conf
 	{0x00F8, 0x00010138}, //tx_adaptivity_en
 };
 
-u32 patch_tbl[][2] ={
+u32 patch_tbl_loadfw[][2] ={
 {0x0044, 0x00000002}, //hosttype
 {0x0048, 0x00000060},
 #if 1//def CONFIG_USB_BT
@@ -994,7 +994,7 @@ u32 patch_tbl[][2] ={
 
 
 #if 0
-u32 patch_tbl[][2] =
+u32 patch_tbl_loadfw[][2] =
 {
 #ifdef CONFIG_PLATFORM_UBUNTU
     {JUMP_TABLE_OFFSET(28), 0x16b5a5}, // 161998
@@ -1012,14 +1012,14 @@ u32 patch_tbl[][2] =
 };
 #endif
 
-u32 syscfg_tbl_pmic_u02[][2] = {
+u32 syscfg_tbl_loadfw_pmic_u02[][2] = {
     {0x40040000, 0x00001AC8}, // 1) fix panic
     {0x40040084, 0x00011580},
     {0x40040080, 0x00000001},
     {0x40100058, 0x00000000},
 };
 
-u32 syscfg_tbl_u04[][2] = {
+u32 syscfg_tbl_loadfw_u04[][2] = {
     {0x40040000, 0x0000042C}, // protect usb replenish rxq / flush rxq, skip flush rxq before start_app
     {0x40040004, 0x0000DD44},
     {0x40040008, 0x00000448},
@@ -1043,7 +1043,7 @@ u32 syscfg_tbl_u04[][2] = {
     {0x40100058, 0x00000000},
 };
 
-u32 syscfg_tbl[][2] = {
+u32 syscfg_tbl_loadfw[][2] = {
     {0x40500014, 0x00000101}, // 1)
     {0x40500018, 0x0000010d}, // 2)//bt only:10d ,bt combo and bt only sw:109
     {0x40500004, 0x00000010}, // 3) the order should not be changed
@@ -1078,7 +1078,7 @@ u32 bt_config_tbl[][2] =
 };
 #endif
 
-u32 rf_tbl_masked[][3] = {
+u32 rf_tbl_masked_loadfw[][3] = {
 	{0x40344058, 0x00800000, 0x00000000},// pll trx
 };
 
@@ -1087,47 +1087,47 @@ static int system_config_8800(struct aic_usb_dev *usb_dev){
     int ret, cnt;
     const u32 mem_addr = 0x40500000;
     struct dbg_mem_read_cfm rd_mem_addr_cfm;
-    ret = rwnx_send_dbg_mem_read_req(usb_dev, mem_addr, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usb_dev, mem_addr, &rd_mem_addr_cfm);
     if (ret) {
         printk("%x rd fail: %d\n", mem_addr, ret);
         return ret;
     }
-    chip_id =(u8)(rd_mem_addr_cfm.memdata >> 16);
+    chip_id_loadfw =(u8)(rd_mem_addr_cfm.memdata >> 16);
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
-    ret = rwnx_send_dbg_mem_read_req(usb_dev, 0x00000004, &rd_mem_addr_cfm);
+    ret = rwnx_send_dbg_mem_read_req_loadfw(usb_dev, 0x00000004, &rd_mem_addr_cfm);
     if (ret) {
         printk("[0x00000004] rd fail: %d\n", ret);
         return ret;
     }
-    chip_sub_id = (u8)(rd_mem_addr_cfm.memdata >> 4);
+    chip_sub_id_loadfw = (u8)(rd_mem_addr_cfm.memdata >> 4);
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
-    printk("chip_id=%x, chip_sub_id=%x\n", chip_id, chip_sub_id);
-    if (chip_id == CHIP_REV_U02) {
-        syscfg_num = sizeof(syscfg_tbl_pmic_u02) / sizeof(u32) / 2;
+    printk("chip_id_loadfw=%x, chip_sub_id_loadfw=%x\n", chip_id_loadfw, chip_sub_id_loadfw);
+    if (chip_id_loadfw == CHIP_REV_U02) {
+        syscfg_num = sizeof(syscfg_tbl_loadfw_pmic_u02) / sizeof(u32) / 2;
         for (cnt = 0; cnt < syscfg_num; cnt++) {
-            ret = rwnx_send_dbg_mem_write_req(usb_dev, syscfg_tbl_pmic_u02[cnt][0], syscfg_tbl_pmic_u02[cnt][1]);
+            ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, syscfg_tbl_loadfw_pmic_u02[cnt][0], syscfg_tbl_loadfw_pmic_u02[cnt][1]);
             if (ret) {
-                printk("%x write fail: %d\n", syscfg_tbl_pmic_u02[cnt][0], ret);
+                printk("%x write fail: %d\n", syscfg_tbl_loadfw_pmic_u02[cnt][0], ret);
                 return ret;
             }
         }
     }
-    if ((chip_id == CHIP_REV_U03) && (chip_sub_id == CHIP_SUB_REV_U04)) {
-        syscfg_num = sizeof(syscfg_tbl_u04) / sizeof(u32) / 2;
+    if ((chip_id_loadfw == CHIP_REV_U03) && (chip_sub_id_loadfw == CHIP_SUB_REV_U04)) {
+        syscfg_num = sizeof(syscfg_tbl_loadfw_u04) / sizeof(u32) / 2;
         printk("cfg u04\n");
         for (cnt = 0; cnt < syscfg_num; cnt++) {
-            ret = rwnx_send_dbg_mem_write_req(usb_dev, syscfg_tbl_u04[cnt][0], syscfg_tbl_u04[cnt][1]);
+            ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, syscfg_tbl_loadfw_u04[cnt][0], syscfg_tbl_loadfw_u04[cnt][1]);
             if (ret) {
-                printk("%x write fail: %d\n", syscfg_tbl_u04[cnt][0], ret);
+                printk("%x write fail: %d\n", syscfg_tbl_loadfw_u04[cnt][0], ret);
                 return ret;
             }
         }
     }
-    syscfg_num = sizeof(syscfg_tbl) / sizeof(u32) / 2;
+    syscfg_num = sizeof(syscfg_tbl_loadfw) / sizeof(u32) / 2;
     for (cnt = 0; cnt < syscfg_num; cnt++) {
-        ret = rwnx_send_dbg_mem_write_req(usb_dev, syscfg_tbl[cnt][0], syscfg_tbl[cnt][1]);
+        ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, syscfg_tbl_loadfw[cnt][0], syscfg_tbl_loadfw[cnt][1]);
         if (ret) {
-            printk("%x write fail: %d\n", syscfg_tbl[cnt][0], ret);
+            printk("%x write fail: %d\n", syscfg_tbl_loadfw[cnt][0], ret);
             return ret;
         }
     }
@@ -1156,7 +1156,7 @@ static int system_reboot(struct aic_usb_dev *usb_dev)
 
     syscfg_num = sizeof(sys_reboot_tbl) / sizeof(u32) / 2;
     for (cnt = 0; cnt < syscfg_num; cnt++) {
-        ret = rwnx_send_dbg_mem_write_req(usb_dev, sys_reboot_tbl[cnt][0], sys_reboot_tbl[cnt][1]);
+        ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, sys_reboot_tbl[cnt][0], sys_reboot_tbl[cnt][1]);
         if (ret) {
             printk("%x write fail: %d\n", sys_reboot_tbl[cnt][0], ret);
             return ret;
@@ -1168,10 +1168,10 @@ static int system_reboot(struct aic_usb_dev *usb_dev)
 static int rf_config(struct aic_usb_dev *usb_dev)
 {
     int ret;
-    ret = rwnx_send_dbg_mem_mask_write_req(usb_dev,
-                rf_tbl_masked[0][0], rf_tbl_masked[0][1], rf_tbl_masked[0][2]);
+    ret = rwnx_send_dbg_mem_mask_write_req_loadfw(usb_dev,
+                rf_tbl_masked_loadfw[0][0], rf_tbl_masked_loadfw[0][1], rf_tbl_masked_loadfw[0][2]);
     if (ret) {
-        printk("rf config %x write fail: %d\n", rf_tbl_masked[0][0], ret);
+        printk("rf config %x write fail: %d\n", rf_tbl_masked_loadfw[0][0], ret);
     }
 
 	return ret;
@@ -1193,49 +1193,49 @@ static int patch_config(struct aic_usb_dev *usb_dev)
 
     printk("%s enter \r\n", __func__);
 
-    //if (testmode) {
-        patch_num = sizeof(patch_tbl)/4;
+    //if (testmode_loadfw) {
+        patch_num = sizeof(patch_tbl_loadfw)/4;
 
         printk("Read FW mem: %08x\n", rd_patch_addr);
-        if ((ret = rwnx_send_dbg_mem_read_req(usb_dev, rd_patch_addr, &rd_patch_addr_cfm))) {
+        if ((ret = rwnx_send_dbg_mem_read_req_loadfw(usb_dev, rd_patch_addr, &rd_patch_addr_cfm))) {
             printk("patch rd fail\n");
         }
 
         printk("%x=%x\n", rd_patch_addr_cfm.memaddr, rd_patch_addr_cfm.memdata);
         config_base = rd_patch_addr_cfm.memdata;
 
-		//if (testmode == FW_NORMAL_MODE) {
-	        if((ret = rwnx_send_dbg_mem_write_req(usb_dev, 0x1e5318, patch_addr))) {
+		//if (testmode_loadfw == FW_NORMAL_MODE) {
+	        if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x1e5318, patch_addr))) {
 	            printk("%x write fail\n", 0x1e5318);
 	        }
             
 			if(adap_test){
 				printk("%s for adaptivity test \r\n", __func__);
-				adap_patch_num = sizeof(adaptivity_patch_tbl)/4;
-		        if((ret = rwnx_send_dbg_mem_write_req(usb_dev, 0x1e531c, patch_num + adap_patch_num))) {
+				adap_patch_num = sizeof(adaptivity_patch_tbl_loadfw)/4;
+		        if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x1e531c, patch_num + adap_patch_num))) {
 		            printk("%x write fail\n", 0x1e531c);
 		        }
 			}else{
-		        if((ret = rwnx_send_dbg_mem_write_req(usb_dev, 0x1e531c, patch_num))) {
+		        if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x1e531c, patch_num))) {
 		            printk("%x write fail\n", 0x1e531c);
 		        }
 			}
-		//}else if(testmode == FW_TEST_MODE){//for old rf fw
-	    //    if((ret = rwnx_send_dbg_mem_write_req(usb_dev, 0x1e4d78, patch_addr))) {
+		//}else if(testmode_loadfw == FW_TEST_MODE){//for old rf fw
+	    //    if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x1e4d78, patch_addr))) {
 	    //        printk("%x write fail\n", 0x1e4d80);
 	    //    }
-	    //    if((ret = rwnx_send_dbg_mem_write_req(usb_dev, 0x1e4d7C, patch_num))) {
+	    //    if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x1e4d7C, patch_num))) {
 	    //        printk("%x write fail\n", 0x1e4d84);
 	    //    }
 		//}
 
         for(cnt = 0; cnt < patch_num/2; cnt+=1)
         {
-            if((ret = rwnx_send_dbg_mem_write_req(usb_dev, start_addr+8*cnt, patch_tbl[cnt][0]+config_base))) {
+            if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, start_addr+8*cnt, patch_tbl_loadfw[cnt][0]+config_base))) {
                 printk("%x write fail\n", start_addr+8*cnt);
             }
 
-            if((ret = rwnx_send_dbg_mem_write_req(usb_dev, start_addr+8*cnt+4, patch_tbl[cnt][1]))) {
+            if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, start_addr+8*cnt+4, patch_tbl_loadfw[cnt][1]))) {
                 printk("%x write fail\n", start_addr+8*cnt+4);
             }
 
@@ -1246,11 +1246,11 @@ static int patch_config(struct aic_usb_dev *usb_dev)
 		if(adap_test){
 			for(cnt = 0; cnt < adap_patch_num/2; cnt+=1)
 			{
-				if((ret = rwnx_send_dbg_mem_write_req(usb_dev, start_addr+8*(cnt+tmp_cnt), adaptivity_patch_tbl[cnt][0]+config_base))) {
+				if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, start_addr+8*(cnt+tmp_cnt), adaptivity_patch_tbl_loadfw[cnt][0]+config_base))) {
 					printk("%x write fail\n", start_addr+8*cnt);
 				}
 
-				if((ret = rwnx_send_dbg_mem_write_req(usb_dev, start_addr+8*(cnt+tmp_cnt)+4, adaptivity_patch_tbl[cnt][1]))) {
+				if((ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, start_addr+8*(cnt+tmp_cnt)+4, adaptivity_patch_tbl_loadfw[cnt][1]))) {
 					printk("%x write fail\n", start_addr+8*cnt+4);
 				}
 			}
@@ -1259,12 +1259,12 @@ static int patch_config(struct aic_usb_dev *usb_dev)
         return ret;
 #if 0
     } else {
-        patch_num = sizeof(patch_tbl) / sizeof(u32) / 2;
+        patch_num = sizeof(patch_tbl_loadfw) / sizeof(u32) / 2;
 
         for(cnt = 0; cnt < patch_num; cnt++) {
-            ret = rwnx_send_dbg_mem_write_req(usb_dev, patch_tbl[cnt][0], patch_tbl[cnt][1]);
+            ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, patch_tbl_loadfw[cnt][0], patch_tbl_loadfw[cnt][1]);
             if(ret) {
-            printk("%x write fail: %d\n", patch_tbl[cnt][0], ret);
+            printk("%x write fail: %d\n", patch_tbl_loadfw[cnt][0], ret);
             break;
             }
         }
@@ -1281,7 +1281,7 @@ static int bt_config(struct aic_usb_dev *usb_dev)
 
     printk("%s enter \r\n", __func__);
     for(cnt = 0; cnt < trap_num; cnt++) {
-        ret = rwnx_send_dbg_mem_write_req(usb_dev, bt_config_tbl[cnt][0], bt_config_tbl[cnt][1]);
+        ret = rwnx_send_dbg_mem_write_req_loadfw(usb_dev, bt_config_tbl[cnt][0], bt_config_tbl[cnt][1]);
         if(ret) {
             printk("%x write fail: %d\n", bt_config_tbl[cnt][0], ret);
             break;
@@ -1380,18 +1380,18 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
     const u32 fw_addr = RAM_FW_ADDR;
     
 #ifdef CONFIG_M2D_OTA_AUTO_SUPPORT
-        if(testmode == FW_M2D_OTA_MODE){
+        if(testmode_loadfw == FW_M2D_OTA_MODE){
             rwnx_plat_m2d_flash_ota_android(usb_dev,FW_M2D_OTA_NAME);
-        }else if(testmode == FW_NORMAL_MODE) {
+        }else if(testmode_loadfw == FW_NORMAL_MODE) {
             rwnx_plat_m2d_flash_ota_check(usb_dev,FW_M2D_OTA_NAME);
         }
 #endif
-        if(testmode == FW_TEST_MODE){
+        if(testmode_loadfw == FW_TEST_MODE){
             if (rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FW_ADDR, FW_RF_BASE_NAME)) {
                 return -1;
             }
     
-            if (chip_id == CHIP_REV_U03) {
+            if (chip_id_loadfw == CHIP_REV_U03) {
                 if(rwnx_plat_bin_fw_upload_android(usb_dev, FW_RAM_ADID_BASE_ADDR, FW_ADID_BASE_NAME_U03)) {
                     return -1;;
                 }
@@ -1418,32 +1418,32 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
                 goto out_free_bus;
             }
 #endif
-        } else if(testmode == FW_BLE_SCAN_WAKEUP_MODE){
+        } else if(testmode_loadfw == FW_BLE_SCAN_WAKEUP_MODE){
 #if 0
             paring_id = rwnx_atoli(paringid);
             rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, FW_BLE_SCAN_WAKEUP_NAME);
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF00, 0x53454C42);//magic_num
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF04, ble_scan_wakeup_reboot_time);//reboot time
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF08, paring_id);
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF0c, paring_id);
-            rwnx_send_dbg_start_app_req(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF00, 0x53454C42);//magic_num
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF04, ble_scan_wakeup_reboot_time);//reboot time
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF08, paring_id);
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF0c, paring_id);
+            rwnx_send_dbg_start_app_req_loadfw(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
 #endif
 #if 1
             paring_ids = (uint32_t*)kmalloc(sizeof(uint32_t) * 8, GFP_KERNEL);
             rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, FW_BLE_SCAN_WAKEUP_NAME);
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF00, 0x53454C42);//magic_num
-            rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF04, ble_scan_wakeup_reboot_time);//reboot time
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF00, 0x53454C42);//magic_num
+            rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF04, ble_scan_wakeup_reboot_time);//reboot time
             paring_id_num = get_paring_ids(paringid, paring_ids);
             for(i = 0; i < paring_id_num; i++){
                 printk("paring_ids[%d]:0x%X \r\n", i, paring_ids[i]);
-                rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF08 + (4 * i), paring_ids[i]);
+                rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF08 + (4 * i), paring_ids[i]);
             }
-            rwnx_send_dbg_start_app_req(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
+            rwnx_send_dbg_start_app_req_loadfw(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
             kfree(paring_ids);
 #endif
             return -1;
 
-        } else if(testmode == FW_BLE_SCAN_AD_FILTER_MODE){
+        } else if(testmode_loadfw == FW_BLE_SCAN_AD_FILTER_MODE){
 /*
             data and ad_data_filter_mask instructions for use
             ex.
@@ -1531,9 +1531,9 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
 
             for(i = 0; i < (sizeof(struct ble_wakeup_param_t)/4 +1); i++){
                 printk("write_blocks[%d]:0x%08X \r\n", i, write_blocks[i]);
-                rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF00 + (4 * i), write_blocks[i]);
+                rwnx_send_dbg_mem_write_req_loadfw(usb_dev, 0x15FF00 + (4 * i), write_blocks[i]);
             }
-            rwnx_send_dbg_start_app_req(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
+            rwnx_send_dbg_start_app_req_loadfw(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
             kfree(wakeup_param);
 
             return -1;
@@ -1541,7 +1541,7 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
             if (rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FW_ADDR, FW_BASE_NAME)) {
                 return -1;;
             }
-            if (chip_id == CHIP_REV_U03) {
+            if (chip_id_loadfw == CHIP_REV_U03) {
                 if(rwnx_plat_bin_fw_upload_android(usb_dev, FW_RAM_ADID_BASE_ADDR, FW_ADID_BASE_NAME_U03)) {
                     return -1;;
                 }
@@ -1559,7 +1559,7 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
                 }
             }
         }
-        if (chip_id == CHIP_REV_U03) {
+        if (chip_id_loadfw == CHIP_REV_U03) {
             if (rwnx_plat_bin_fw_patch_table_upload_android(usb_dev, FW_PATCH_TABLE_NAME_U03)) {
                 return -1;;
             }
@@ -1570,7 +1570,7 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
         }
     
 #if 0
-        if(testmode == FW_TEST_MODE){
+        if(testmode_loadfw == FW_TEST_MODE){
             if(rwnx_plat_bin_fw_upload_android(usb_dev, FW_PATCH_TEST_BASE_ADDR, FW_PATCH_TEST_BASE_NAME)) {
                 goto out_free_bus;
             }
@@ -1588,7 +1588,7 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
         if (rf_config(usb_dev)){
             return -1;;
         }
-        if (rwnx_send_dbg_start_app_req(usb_dev, fw_addr, HOST_START_APP_AUTO)) {
+        if (rwnx_send_dbg_start_app_req_loadfw(usb_dev, fw_addr, HOST_START_APP_AUTO)) {
             return -1;
         }
         
@@ -1677,7 +1677,7 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
 
     bus_if->ops = &aicwf_usb_bus_ops;
 
-    rx_priv = aicwf_rx_init(usb_dev);
+    rx_priv = aicwf_rx_init_loadfw(usb_dev);
     if(!rx_priv) {
         txrx_err("rx init failed\n");
         ret = -1;
@@ -1685,9 +1685,9 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
     }
     usb_dev->rx_priv = rx_priv;
 
-    ret = aicwf_bus_init(0, dev);
+    ret = aicwf_bus_init_loadfw(0, dev);
     if (ret < 0) {
-        usb_err("aicwf_bus_init err %d\n", ret);
+        usb_err("aicwf_bus_init_loadfw err %d\n", ret);
         goto out_free_bus;
     }
 
@@ -1710,7 +1710,7 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
         usb_dev->chipid == PRODUCT_ID_AIC8800D81||
         usb_dev->chipid == PRODUCT_ID_AIC8800D81X2 ||
         usb_dev->chipid == PRODUCT_ID_AIC8800D89X2)){
-		rwnx_send_reboot(usb_dev);
+		rwnx_send_reboot_loadfw(usb_dev);
 		goto out_free_bus;
 	}
 
@@ -1728,8 +1728,8 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
     return 0;
 
 out_free_bus:
-	aicwf_bus_deinit(dev);
-	aicwf_rx_deinit(usb_dev->rx_priv);
+	aicwf_bus_deinit_loadfw(dev);
+	aicwf_rx_deinit_loadfw(usb_dev->rx_priv);
     kfree(bus_if);
 out_free_usb:
     aicwf_usb_deinit(usb_dev);
@@ -1750,10 +1750,10 @@ static void aicwf_usb_disconnect(struct usb_interface *intf)
     if (!usb_dev)
         return;
 
-    aicwf_bus_deinit(usb_dev->dev);
+    aicwf_bus_deinit_loadfw(usb_dev->dev);
     aicwf_usb_deinit(usb_dev);
     if (usb_dev->rx_priv)
-        aicwf_rx_deinit(usb_dev->rx_priv);
+        aicwf_rx_deinit_loadfw(usb_dev->rx_priv);
     kfree(usb_dev->bus_if);
     kfree(usb_dev);
 }
@@ -1812,14 +1812,14 @@ static struct usb_driver aicwf_usbdrvr = {
     .disable_hub_initiated_lpm = 1,
 };
 
-void aicwf_usb_register(void)
+void aicwf_usb_register_loadfw(void)
 {
     if (usb_register(&aicwf_usbdrvr) < 0) {
         usb_err("usb_register failed\n");
     }
 }
 
-void aicwf_usb_exit(void)
+void aicwf_usb_exit_loadfw(void)
 {
     usb_deregister(&aicwf_usbdrvr);
 }

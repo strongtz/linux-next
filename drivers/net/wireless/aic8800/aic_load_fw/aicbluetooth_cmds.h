@@ -150,10 +150,10 @@ struct rwnx_cmd_mgr {
         queue_work((cmd_mgr)->cmd_wq, &cmd_mgr->cmdWork); \
     } while (0)
 #endif
-void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr);
-void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr);
+void rwnx_cmd_mgr_init_loadfw(struct rwnx_cmd_mgr *cmd_mgr);
+void rwnx_cmd_mgr_deinit_loadfw(struct rwnx_cmd_mgr *cmd_mgr);
 int cmd_mgr_queue_force_defer(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd);
-void aicwf_set_cmd_tx(void *dev, struct lmac_msg *msg, uint len);
+void aicwf_set_cmd_tx_loadfw(void *dev, struct lmac_msg *msg, uint len);
 
 enum
 {
@@ -306,21 +306,21 @@ enum {
     HOST_START_APP_REBOOT,
 };
 
-int rwnx_send_dbg_mem_mask_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
+int rwnx_send_dbg_mem_mask_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr,
                                      u32 mem_mask, u32 mem_data);
 
 
-int rwnx_send_dbg_mem_block_write_req(struct aic_usb_dev *usbdev, u32 mem_addr,
+int rwnx_send_dbg_mem_block_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr,
                                       u32 mem_size, u32 *mem_data);
                                       
-int rwnx_send_dbg_mem_write_req(struct aic_usb_dev *usbdev, u32 mem_addr, u32 mem_data);
-int rwnx_send_dbg_mem_read_req(struct aic_usb_dev *usbdev, u32 mem_addr, struct dbg_mem_read_cfm *cfm);
+int rwnx_send_dbg_mem_write_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr, u32 mem_data);
+int rwnx_send_dbg_mem_read_req_loadfw(struct aic_usb_dev *usbdev, u32 mem_addr, struct dbg_mem_read_cfm *cfm);
 
-void rwnx_rx_handle_msg(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg);
+void rwnx_rx_handle_msg_loadfw(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg);
 
-int rwnx_send_dbg_start_app_req(struct aic_usb_dev *usbdev, u32 boot_addr,
+int rwnx_send_dbg_start_app_req_loadfw(struct aic_usb_dev *usbdev, u32 boot_addr,
                                 u32 boot_type);
 
-int rwnx_send_reboot(struct aic_usb_dev *usbdev);
+int rwnx_send_reboot_loadfw(struct aic_usb_dev *usbdev);
 
 #endif

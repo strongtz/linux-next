@@ -26,7 +26,7 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
 int rwnx_plat_userconfig_upload_android(struct aic_usb_dev *usbdev, char *filename);
 int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr, char *filename);
 
-int8_t rwnx_atoi(char *value);
+int8_t rwnx_atoi_loadfw(char *value);
 uint32_t rwnx_atoli(char *value);
 int aicbt_patch_table_free(struct aicbt_patch_table *head);
 struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev, const char *filename);
