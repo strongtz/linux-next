@@ -71,6 +71,8 @@ static void qcom_tzmem_cleanup_area(struct qcom_tzmem_area *area)
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <linux/of.h>
 
+#define QCOM_SHM_BRIDGE_SELF_OWNER BIT(1)
+#define QCOM_SHM_BRIDGE_SELF_OWNER_PERM_SHIFT 2
 #define QCOM_SHM_BRIDGE_NUM_VM_SHIFT 9
 
 static bool qcom_tzmem_using_shm_bridge;
@@ -113,6 +115,7 @@ notsupp:
 static int qcom_tzmem_init_area(struct qcom_tzmem_area *area)
 {
 	u64 pfn_and_ns_perm, ipfn_and_s_perm, size_and_flags;
+	u64 ns_vmids = QCOM_SCM_VMID_HLOS;
 	int ret;
 
 	if (!qcom_tzmem_using_shm_bridge)
@@ -122,12 +125,18 @@ static int qcom_tzmem_init_area(struct qcom_tzmem_area *area)
 	ipfn_and_s_perm = (u64)area->paddr | QCOM_SCM_PERM_RW;
 	size_and_flags = area->size | (1 << QCOM_SHM_BRIDGE_NUM_VM_SHIFT);
 
+	if (is_hyp_mode_available()) {
+		size_and_flags = area->size | QCOM_SHM_BRIDGE_SELF_OWNER |
+				 (QCOM_SCM_PERM_RW << QCOM_SHM_BRIDGE_SELF_OWNER_PERM_SHIFT);
+		ns_vmids = 0;
+	}
+
 	u64 *handle __free(kfree) = kzalloc(sizeof(*handle), GFP_KERNEL);
 	if (!handle)
 		return -ENOMEM;
 
 	ret = qcom_scm_shm_bridge_create(pfn_and_ns_perm, ipfn_and_s_perm,
-					 size_and_flags, QCOM_SCM_VMID_HLOS,
+					 size_and_flags, ns_vmids,
 					 handle);
 	if (ret)
 		return ret;
