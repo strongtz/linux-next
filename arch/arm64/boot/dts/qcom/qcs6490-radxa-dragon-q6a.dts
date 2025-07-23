@@ -731,7 +731,7 @@
 	perst-gpios = <&tlmm 2 GPIO_ACTIVE_LOW>;
 	wake-gpios = <&tlmm 3 GPIO_ACTIVE_HIGH>;
 
-	pinctrl-0 = <&pcie1_reset_n>, <&pcie1_wake_n>;
+	pinctrl-0 = <&pcie1_reset_n>, <&pcie1_wake_n>, <&pcie1_clkreq_n>;
 	pinctrl-names = "default";
 
 	iommu-map = <0x0 &apps_smmu 0x1c80 0x1>,
@@ -1326,6 +1326,16 @@
 /* PINCTRL - additions to nodes defined in sc7280.dtsi */
 &dp_hot_plug_det {
 	bias-disable;
+};
+
+&pcie0_clkreq_n {
+	bias-pull-up;
+	drive-strength = <2>;
+};
+
+&pcie1_clkreq_n {
+	bias-pull-up;
+	drive-strength = <2>;
 };
 
 &sdc2_clk {
