@@ -1256,6 +1256,7 @@
 };
 
 &ufs_mem_hc {
+	cd-gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
 	reset-gpios = <&tlmm 175 GPIO_ACTIVE_LOW>;
 	vcc-supply = <&vreg_l7b_2p96>;
 	vcc-max-microamp = <800000>;
@@ -1263,6 +1264,9 @@
 	vccq-max-microamp = <900000>;
 	vccq2-supply = <&vreg_l9b_1p2>;
 	vccq2-max-microamp = <1300000>;
+
+	pinctrl-0 = <&ufs_cd>;
+	pinctrl-names = "default";
 
 	/delete-property/ qcom,ice;
 
@@ -1399,6 +1403,13 @@
 	sd_cd: sd-cd-state {
 		pins = "gpio91";
 		function = "gpio";
+		bias-pull-up;
+	};
+
+	ufs_cd: ufs-cd-state {
+		pins = "gpio7";
+		function = "gpio";
+		drive-strength = <2>;
 		bias-pull-up;
 	};
 
