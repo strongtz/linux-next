@@ -11,7 +11,7 @@
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 #include <dt-bindings/pwm/pwm.h>
 
-/ {
+&{/} {
 	vcc_3v3_lcd: vcc-3v3-lcd-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_3v3";

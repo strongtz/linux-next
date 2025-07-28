@@ -9,14 +9,12 @@
 #include <dt-bindings/clock/qcom,camcc-sc7280.h>
 #include <dt-bindings/gpio/gpio.h>
 
-/ {
-	reserved-memory {
-		linux,cma {
-			compatible = "shared-dma-pool";
-			size = <0x0 0x8000000>;
-			reusable;
-			linux,cma-default;
-		};
+&{/reserved-memory} {
+	linux,cma {
+		compatible = "shared-dma-pool";
+		size = <0x0 0x8000000>;
+		reusable;
+		linux,cma-default;
 	};
 };
 

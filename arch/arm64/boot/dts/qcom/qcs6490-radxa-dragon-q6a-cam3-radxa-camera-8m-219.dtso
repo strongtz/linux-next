@@ -9,7 +9,7 @@
 #include <dt-bindings/clock/qcom,camcc-sc7280.h>
 #include <dt-bindings/gpio/gpio.h>
 
-/ {
+&{/} {
 	ext_cam_clk_imx219_1: ext-cam-clk-imx219-1 {
 		status = "okay";
 		compatible = "fixed-clock";
@@ -28,6 +28,15 @@
 		gpios = <&tlmm 78 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cam_pwdn_gpio_1>;
+	};
+};
+
+&{/reserved-memory} {
+	linux,cma {
+		compatible = "shared-dma-pool";
+		size = <0x0 0x8000000>;
+		reusable;
+		linux,cma-default;
 	};
 };
 
