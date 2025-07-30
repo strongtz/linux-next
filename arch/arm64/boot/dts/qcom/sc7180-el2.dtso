@@ -14,6 +14,14 @@
 	};
 };
 
+&remoteproc_adsp {
+	qcom,broken-reset;
+};
+
+&remoteproc_mpss {
+	/* Reset is implemented in TZ firmware, so no qcom,broken-reset here */
+};
+
 /* Venus can be used in EL2 if booted similarly to ChromeOS devices. */
 &venus {
 	video-firmware {
