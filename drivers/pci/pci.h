@@ -920,6 +920,11 @@ void pci_release_of_node(struct pci_dev *dev);
 void pci_set_bus_of_node(struct pci_bus *bus);
 void pci_release_bus_of_node(struct pci_bus *bus);
 
+void pci_parse_of_wake_gpio(struct pci_dev *dev);
+void pci_remove_of_wake_gpio(struct pci_dev *dev);
+int pci_configure_wake_irq(struct pci_dev *pdev);
+void pci_remove_wake_irq(struct pci_dev *pdev);
+
 int devm_of_pci_bridge_init(struct device *dev, struct pci_host_bridge *bridge);
 bool of_pci_supply_present(struct device_node *np);
 int of_pci_get_equalization_presets(struct device *dev,
@@ -964,6 +969,11 @@ static inline int devm_of_pci_bridge_init(struct device *dev, struct pci_host_br
 {
 	return 0;
 }
+
+static inline void pci_parse_of_wake_gpio(struct pci_dev *dev) { }
+static inline void pci_remove_of_wake_gpio(struct pci_dev *dev) { }
+static inline int pci_configure_wake_irq(struct pci_dev *pdev) { return 0; }
+static inline void pci_remove_wake_irq(struct pci_dev *pdev) { }
 
 static inline bool of_pci_supply_present(struct device_node *np)
 {

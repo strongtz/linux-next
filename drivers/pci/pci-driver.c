@@ -447,10 +447,19 @@ static int pci_device_probe(struct device *dev)
 	if (error < 0)
 		return error;
 
+	if (pci_pcie_type(pci_dev) == PCI_EXP_TYPE_ENDPOINT) {
+		error =  pci_configure_wake_irq(pci_dev);
+		if (error) {
+			pcibios_free_irq(pci_dev);
+			return error;
+		}
+	}
+
 	pci_dev_get(pci_dev);
 	error = __pci_device_probe(drv, pci_dev);
 	if (error) {
 		pcibios_free_irq(pci_dev);
+		pci_remove_wake_irq(pci_dev);
 		pci_dev_put(pci_dev);
 	}
 
@@ -475,6 +484,7 @@ static void pci_device_remove(struct device *dev)
 		pm_runtime_put_noidle(dev);
 	}
 	pcibios_free_irq(pci_dev);
+	pci_remove_wake_irq(pci_dev);
 	pci_dev->driver = NULL;
 	pci_iov_remove(pci_dev);
 
