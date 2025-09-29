@@ -265,6 +265,19 @@ struct sdhci_msm_variant_info {
 	const struct sdhci_msm_offset *offset;
 };
 
+/*
+ * DLL registers which needs be programmed with HSR settings.
+ * Add any new register only at the end and don't change the
+ * sequence.
+ */
+struct sdhci_msm_dll {
+	u32 dll_config[2];
+	u32 dll_config_2[2];
+	u32 dll_config_3[2];
+	u32 dll_usr_ctl[2];
+	u32 ddr_config[2];
+};
+
 struct sdhci_msm_host {
 	struct platform_device *pdev;
 	void __iomem *core_mem;	/* MSM SDCC mapped address */
@@ -273,6 +286,7 @@ struct sdhci_msm_host {
 	struct clk *xo_clk;	/* TCXO clk needed for FLL feature of cm_dll*/
 	/* core, iface, cal and sleep clocks */
 	struct clk_bulk_data bulk_clks[4];
+	struct sdhci_msm_dll dll;
 #ifdef CONFIG_MMC_CRYPTO
 	struct qcom_ice *ice;
 #endif
@@ -301,6 +315,7 @@ struct sdhci_msm_host {
 	u32 dll_config;
 	u32 ddr_config;
 	bool vqmmc_enabled;
+	bool artanis_dll;
 };
 
 static const struct sdhci_msm_offset *sdhci_priv_msm_offset(struct sdhci_host *host)
@@ -2516,6 +2531,73 @@ static int sdhci_msm_gcc_reset(struct device *dev, struct sdhci_host *host)
 	return ret;
 }
 
+static int sdhci_msm_dt_get_array(struct device *dev, const char *prop_name,
+				  u32 **dll_table, int *len)
+{
+	struct device_node *np = dev->of_node;
+	u32 *arr = NULL;
+	int ret = 0, sz = 0;
+
+	if (!np)
+		return -ENODEV;
+	if (!of_get_property(np, prop_name, &sz))
+		return -EINVAL;
+
+	sz = sz / sizeof(*arr);
+	if (sz <= 0)
+		return -EINVAL;
+
+	arr = kcalloc(sz,  sizeof(*arr), GFP_KERNEL);
+	if (!arr)
+		return -ENOMEM;
+
+	ret = of_property_read_u32_array(np, prop_name, arr, sz);
+	if (ret) {
+		dev_err(dev, "%s failed reading array %d\n", prop_name, ret);
+		*len = 0;
+		return ret;
+	}
+
+	*dll_table = arr;
+	*len = sz;
+
+	return ret;
+}
+
+static int sdhci_msm_dt_parse_dll_info(struct device *dev, struct sdhci_msm_host *msm_host)
+{
+	int dll_table_len, dll_reg_count;
+	u32 *dll_table = NULL;
+	int i, j;
+
+	msm_host->artanis_dll = false;
+
+	if (sdhci_msm_dt_get_array(dev, "qcom,dll-hsr-list",
+				   &dll_table, &dll_table_len))
+		return -EINVAL;
+
+	dll_reg_count = sizeof(struct sdhci_msm_dll) / sizeof(u32);
+
+	if (dll_table_len != dll_reg_count) {
+		dev_err(dev, "Number of HSR entries are not matching\n");
+		return -EINVAL;
+	}
+
+	for (i = 0, j = 0; j < 2; i = i + 5, j++) {
+		msm_host->dll.dll_config[j] = dll_table[i];
+		msm_host->dll.dll_config_2[j] = dll_table[i + 1];
+		msm_host->dll.dll_config_3[j] = dll_table[i + 2];
+		msm_host->dll.dll_usr_ctl[j] = dll_table[i + 3];
+		msm_host->dll.ddr_config[j] = dll_table[i + 4];
+	}
+
+	msm_host->artanis_dll = true;
+
+	kfree(dll_table);
+
+	return 0;
+}
+
 static int sdhci_msm_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
@@ -2561,6 +2643,15 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	sdhci_msm_get_of_property(pdev, host);
 
 	msm_host->saved_tuning_phase = INVALID_TUNING_PHASE;
+
+	/*
+	 * Parse HSR dll only when property is present in DT.
+	 */
+	if (of_find_property(node, "qcom,dll-hsr-list", NULL)) {
+		ret = sdhci_msm_dt_parse_dll_info(&pdev->dev, msm_host);
+		if (ret)
+			return ret;
+	}
 
 	ret = sdhci_msm_gcc_reset(&pdev->dev, host);
 	if (ret)
