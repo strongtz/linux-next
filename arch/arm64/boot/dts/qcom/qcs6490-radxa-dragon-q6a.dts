@@ -750,6 +750,13 @@
 	status = "okay";
 };
 
+&psci {
+	reboot-mode {
+		mode-bootloader = <0x10001 0x2>;
+		mode-edl = <0 0x1>;
+	};
+};
+
 &qspi {
 	/* It's not possible to use QSPI with iommu */
 	/* due to an error in qcom_smmu_write_s2cr */
