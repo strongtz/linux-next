@@ -1555,16 +1555,27 @@ static void qcom_pcie_icc_opp_update(struct qcom_pcie *pcie)
 {
 	u32 offset, status, width, speed;
 	struct dw_pcie *pci = pcie->pci;
-	unsigned long freq_kbps;
+	unsigned long freq_kbps = 0;
 	struct dev_pm_opp *opp;
 	int ret, freq_mbps;
 
 	offset = dw_pcie_find_capability(pci, PCI_CAP_ID_EXP);
 	status = readw(pci->dbi_base + offset + PCI_EXP_LNKSTA);
 
-	/* Only update constraints if link is up. */
-	if (!(status & PCI_EXP_LNKSTA_DLLLA))
+	/* Set to lowest OPP if link is not up. */
+	if (!(status & PCI_EXP_LNKSTA_DLLLA)) {
+		if (pcie->use_pm_opp) {
+			opp = dev_pm_opp_find_freq_ceil(pci->dev, &freq_kbps);
+			if (!IS_ERR(opp)) {
+				ret = dev_pm_opp_set_opp(pci->dev, opp);
+				if (ret)
+					dev_err(pci->dev, "Failed to set OPP for freq (%lu): %d\n",
+						freq_kbps, ret);
+				dev_pm_opp_put(opp);
+			}
+		}
 		return;
+	}
 
 	speed = FIELD_GET(PCI_EXP_LNKSTA_CLS, status);
 	width = FIELD_GET(PCI_EXP_LNKSTA_NLW, status);
