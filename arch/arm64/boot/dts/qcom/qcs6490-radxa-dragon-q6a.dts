@@ -767,6 +767,8 @@
 	pinctrl-1 = <&qspi_sleep>;
 	pinctrl-names = "default", "sleep";
 
+	use-polling;
+
 	status = "okay";
 
 	spi_flash: flash@0 {
