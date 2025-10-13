@@ -137,6 +137,11 @@ properties:
     $ref: /schemas/types.yaml#/definitions/uint32
     description: platform specific settings for DLL_CONFIG reg.
 
+  qcom,dll-presets:
+    maxItems: 10
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: platform specific settings for DLL registers.
+
   iommus:
     minItems: 1
     maxItems: 8
