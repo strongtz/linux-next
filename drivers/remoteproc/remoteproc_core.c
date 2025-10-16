@@ -1431,11 +1431,6 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 		goto clean_up_resources;
 	}
 
-	/* If rproc->name is cdsp, wait 5 seconds before starting */
-	if (strcmp(rproc->name, "cdsp") == 0) {
-		msleep(5000);
-	}
-
 	ret = rproc_start(rproc, fw);
 	if (ret == -ETIMEDOUT) {
 		dev_warn(dev, "%s start timed out, retrying up to 5 times...\n", rproc->name);

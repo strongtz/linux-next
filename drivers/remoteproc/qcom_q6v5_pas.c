@@ -377,7 +377,7 @@ static void qcom_pas_handover(struct qcom_q6v5 *q6v5)
 		regulator_disable(pas->cx_supply);
 	clk_disable_unprepare(pas->aggre2_clk);
 	clk_disable_unprepare(pas->xo);
-	qcom_pas_pds_disable(pas, pas->proxy_pds, pas->proxy_pd_count);
+	// qcom_pas_pds_disable(pas, pas->proxy_pds, pas->proxy_pd_count);
 }
 
 static int qcom_pas_stop(struct rproc *rproc)
