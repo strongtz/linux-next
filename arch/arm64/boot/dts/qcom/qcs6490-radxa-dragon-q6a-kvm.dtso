@@ -3,6 +3,8 @@
  * Copyright (c) 2025 Radxa Computer (Shenzhen) Co., Ltd.
  */
 
+#include <dt-bindings/firmware/qcom,scm.h>
+
 /dts-v1/;
 /plugin/;
 
@@ -13,4 +15,35 @@
 /* We can't and don't need to use zap shader in EL2 as linux can zap the gpu on it's own. */
 &gpu_zap_shader {
 	status = "disabled";
+};
+
+&pcie1 {
+	/* Allow using upper PCIe space */
+	ranges = <0x01000000 0x0 0x00000000 0x0 0x40200000 0x0 0x100000>,
+			<0x02000000 0x0 0x40300000 0x0 0x40300000 0x0 0x1fd00000>,
+			<0x03000000 0x4 0x00000000 0x4 0x00000000 0x3 0x00000000>;
+
+	/* Support for QPS615 PCIe switch and typical dGPU */
+	iommu-map = <0x0 &apps_smmu 0x1c80 0x1>,
+		    <0x100 &apps_smmu 0x1c80 0x1>,
+		    <0x101 &apps_smmu 0x1c80 0x1>,
+		    <0x208 &apps_smmu 0x1c84 0x1>,
+		    <0x210 &apps_smmu 0x1c85 0x1>,
+		    <0x218 &apps_smmu 0x1c86 0x1>,
+		    <0x300 &apps_smmu 0x1c87 0x1>,
+		    <0x400 &apps_smmu 0x1c88 0x1>,
+		    <0x500 &apps_smmu 0x1c89 0x1>,
+		    <0x501 &apps_smmu 0x1c90 0x1>;
+};
+
+&remoteproc_adsp {
+	qcom,broken-reset;
+};
+
+&remoteproc_cdsp {
+	qcom,broken-reset;
+};
+
+&scm {
+	qcom,shm-bridge-vmid = <QCOM_SCM_VMID_SELF_OWNER>;
 };
