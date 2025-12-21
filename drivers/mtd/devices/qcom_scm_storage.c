@@ -5,7 +5,6 @@
  * Copyright (c) 2025 Junhao Xie <bigfoot@radxa.com>
  */
 
-#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
 #include <linux/platform_device.h>
@@ -28,7 +27,6 @@ struct qcom_scm_storage {
 	struct mtd_info mtd;
 	struct qcom_scm_storage_info info;
 	size_t buffer_size;
-	dma_addr_t buffer_phys;
 	u8 *buffer;
 };
 
@@ -47,7 +45,7 @@ static int qcom_scm_storage_erase(struct mtd_info *mtd,
 	return qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 					 QCOM_SCM_STORAGE_ERASE,
 					 instr->addr / host->info.block_size,
-					 0, instr->len);
+					 NULL, instr->len);
 }
 
 static int qcom_scm_storage_read(struct mtd_info *mtd,
@@ -88,7 +86,7 @@ static int qcom_scm_storage_read(struct mtd_info *mtd,
 
 		ret = qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 						QCOM_SCM_STORAGE_READ,
-						lba, host->buffer_phys,
+						lba, host->buffer,
 						to_read);
 		if (ret)
 			return ret;
@@ -138,7 +136,7 @@ static int qcom_scm_storage_write(struct mtd_info *mtd,
 
 			ret = qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 							QCOM_SCM_STORAGE_READ,
-							lba, host->buffer_phys,
+							lba, host->buffer,
 							block_size);
 			if (ret)
 				return ret;
@@ -152,7 +150,7 @@ static int qcom_scm_storage_write(struct mtd_info *mtd,
 
 		ret = qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 						QCOM_SCM_STORAGE_WRITE,
-						lba, host->buffer_phys,
+						lba, host->buffer,
 						to_write);
 		if (ret)
 			return ret;
@@ -185,22 +183,17 @@ static int qcom_scm_storage_probe(struct platform_device *pdev)
 		return ret;
 
 	host->buffer_size = SZ_256K;
-	host->buffer = dmam_alloc_coherent(dev,
-					   host->buffer_size,
-					   &host->buffer_phys,
-					   GFP_KERNEL);
+	host->buffer = devm_kmalloc(dev, host->buffer_size, GFP_KERNEL);
 	if (!host->buffer)
 		return -ENOMEM;
 
 	ret = qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 					QCOM_SCM_STORAGE_GET_INFO,
-					0, host->buffer_phys,
+					0, &host->info,
 					sizeof(host->info));
 	if (ret < 0)
 		return dev_err_probe(dev, ret,
 				     "failed to get storage info\n");
-
-	memcpy(&host->info, host->buffer, sizeof(host->info));
 
 	if (!host->info.block_size || !host->info.total_blocks)
 		return dev_err_probe(dev, -EINVAL,

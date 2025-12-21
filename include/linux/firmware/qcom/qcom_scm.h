@@ -209,14 +209,13 @@ static inline int qcom_scm_qseecom_app_send(u32 app_id,
 
 int qcom_scm_storage_send_cmd(enum qcom_scm_storage_type storage_type,
 			      enum qcom_scm_storage_cmd_id cmd_id,
-			      u64 lba, phys_addr_t payload_addr,
-			      size_t payload_size);
+			      u64 lba, void *payload, size_t payload_size);
 
 #else /* CONFIG_MTD_QCOM_SCM_STORAGE */
 
 static inline int qcom_scm_storage_send_cmd(enum qcom_scm_storage_type storage_type,
 					    enum qcom_scm_storage_cmd_id cmd_id,
-					    u64 lba, phys_addr_t payload_addr,
+					    u64 lba, void *payload,
 					    size_t payload_size)
 {
 	return -EOPNOTSUPP;

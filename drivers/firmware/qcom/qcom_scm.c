@@ -81,6 +81,12 @@ struct qcom_scm_storage_cmd_details {
 	__le64 data_size;
 };
 
+struct qcom_scm_storage_data {
+	struct qcom_scm_storage_cmd cmd;
+	struct qcom_scm_storage_cmd_details details;
+	u8 payload[];
+};
+
 /**
  * struct qcom_scm_qseecom_resp - QSEECOM SCM call response.
  * @result:    Result or status of the SCM call. See &enum qcom_scm_qseecom_result.
@@ -2124,46 +2130,48 @@ static int qcom_scm_qseecom_init(struct qcom_scm *scm)
 
 int qcom_scm_storage_send_cmd(enum qcom_scm_storage_type storage_type,
 			      enum qcom_scm_storage_cmd_id cmd_id,
-			      u64 lba, phys_addr_t payload_addr,
-			      size_t payload_size)
+			      u64 lba, void *payload, size_t payload_size)
 {
+	struct qcom_scm_storage_data *data __free(qcom_tzmem);
 	struct qcom_scm_res scm_res = {};
 	struct qcom_scm_desc desc = {};
-	struct qcom_scm_storage_cmd *cmd;
-	struct qcom_scm_storage_cmd_details *details;
-	size_t buf_size;
+	size_t buf_size, payload_bytes;
 	int ret;
 
-	buf_size = sizeof(*cmd) + sizeof(*details);
-	void *data __free(qcom_tzmem) = qcom_tzmem_alloc(__scm->mempool,
-							 buf_size,
-							 GFP_KERNEL);
+	payload_bytes = (payload && payload_size) ? payload_size : 0;
+	buf_size = sizeof(*data) + payload_bytes;
+	data = qcom_tzmem_alloc(__scm->mempool, buf_size, GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 	memset(data, 0, buf_size);
 
-	cmd = data;
-	cmd->storage_type = storage_type;
-	cmd->storage_cmd = cmd_id;
+	if (payload_bytes)
+		memcpy(data->payload, payload, payload_size);
 
-	details = data + sizeof(*cmd);
-	details->lba = lba;
-	details->data_ptr = payload_addr;
-	details->length = payload_size;
+	data->cmd.storage_type = storage_type;
+	data->cmd.storage_cmd = cmd_id;
+
+	data->details.lba = lba;
+	if (payload_bytes)
+		data->details.data_ptr = qcom_tzmem_to_phys(data->payload);
+	data->details.length = payload_size;
 
 	desc.svc = QCOM_SCM_SVC_STORAGE;
 	desc.cmd = QCOM_SCM_STORAGE_CMD;
 	desc.arginfo = QCOM_SCM_ARGS(4, QCOM_SCM_RO, QCOM_SCM_VAL,
 				     QCOM_SCM_RW, QCOM_SCM_VAL);
-	desc.args[0] = qcom_tzmem_to_phys(cmd);
-	desc.args[1] = sizeof(*cmd);
-	desc.args[2] = qcom_tzmem_to_phys(details);
-	desc.args[3] = sizeof(*details);
+	desc.args[0] = qcom_tzmem_to_phys(&data->cmd);
+	desc.args[1] = sizeof(data->cmd);
+	desc.args[2] = qcom_tzmem_to_phys(&data->details);
+	desc.args[3] = sizeof(data->details);
 	desc.owner = ARM_SMCCC_OWNER_SIP;
 
 	ret = qcom_scm_call(__scm->dev, &desc, &scm_res);
 	if (ret)
 		return ret;
+
+	if (payload_bytes)
+		memcpy(payload, data->payload, payload_size);
 
 	switch (scm_res.result[0]) {
 	case STORAGE_RESULT_SUCCESS:
@@ -2218,18 +2226,13 @@ static void qcom_scm_storage_free(void *data)
 
 static int qcom_scm_storage_init(struct qcom_scm *scm)
 {
-	struct qcom_scm_storage_info *info __free(qcom_tzmem) = NULL;
+	struct qcom_scm_storage_info info = {};
 	struct platform_device *storage_dev;
 	int ret;
 
-	info = qcom_tzmem_alloc(__scm->mempool, sizeof(*info), GFP_KERNEL);
-	if (!info)
-		return -ENOMEM;
-
 	ret = qcom_scm_storage_send_cmd(QCOM_SCM_STORAGE_SPINOR,
 					QCOM_SCM_STORAGE_GET_INFO,
-					0, qcom_tzmem_to_phys(info),
-					sizeof(*info));
+					0, &info, sizeof(info));
 	if (ret < 0) {
 		dev_info(scm->dev, "scm storage not available: %d\n", ret);
 		return 0;
@@ -2241,7 +2244,7 @@ static int qcom_scm_storage_init(struct qcom_scm *scm)
 	}
 
 	dev_info(scm->dev, "scm storage size %llu bytes\n",
-		 info->total_blocks * info->block_size);
+		 info.total_blocks * info.block_size);
 
 	storage_dev = platform_device_alloc("qcom_scm_storage", -1);
 	if (!storage_dev)
