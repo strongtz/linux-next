@@ -304,6 +304,7 @@
 
 		/* CH7218A needs to be powered on for HPD logic to work */
 		regulator-always-on;
+		regulator-boot-on;
 	};
 
 	vcc_nvme_3v3: regulator-vcc-nvme-3v3 {
